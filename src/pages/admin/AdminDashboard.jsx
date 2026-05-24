@@ -37,13 +37,11 @@ function AdminDashboard() {
   }
 
   const handleNewEvent = () => {
-    // TODO: Navigate to create event page
-    console.log('Create new event')
+    navigate('/admin/events/create')
   }
 
   const handleManageEvent = (eventId) => {
-    // TODO: Navigate to event management page
-    console.log('Manage event:', eventId)
+    navigate(`/admin/events/${eventId}`)
   }
 
   return (
