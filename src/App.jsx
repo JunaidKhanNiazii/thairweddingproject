@@ -2,17 +2,16 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
-import Home from './pages/Home';
-import Login from './pages/admin/Login';
-import Dashboard from './pages/admin/Dashboard';
+import Login from './pages/admin/AdminLogin';
+import Dashboard from './pages/admin/AdminDashboard';
 
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          {/* Public routes */}
-          <Route path="/" element={<Home />} />
+          {/* Redirect root to admin login */}
+          <Route path="/" element={<Navigate to="/admin/login" replace />} />
 
           {/* Admin routes */}
           <Route path="/admin" element={<Navigate to="/admin/login" replace />} />
@@ -27,7 +26,7 @@ function App() {
           />
 
           {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/admin/login" replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
