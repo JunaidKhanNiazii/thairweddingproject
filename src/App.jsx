@@ -4,6 +4,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 
 import Login from './pages/admin/AdminLogin';
 import Dashboard from './pages/admin/AdminDashboard';
+import CreateEvent from './pages/admin/CreateEvent';
+import EventDetail from './pages/admin/EventDetail';
 
 function App() {
   return (
@@ -21,6 +23,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/events/create"
+            element={
+              <ProtectedRoute>
+                <CreateEvent />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/events/:eventId"
+            element={
+              <ProtectedRoute>
+                <EventDetail />
               </ProtectedRoute>
             }
           />
