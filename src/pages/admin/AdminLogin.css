@@ -1,0 +1,115 @@
+/* ============================================
+   ADMIN LOGIN PAGE
+   ============================================ */
+
+.admin-login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  background-color: var(--bg-primary);
+}
+
+.admin-login-container {
+  width: 100%;
+  max-width: 480px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-gold);
+  border-radius: var(--radius-md);
+  padding: 0.5rem 2.5rem 1.5rem;
+  box-shadow: var(--shadow-soft);
+}
+
+/* Logo */
+.admin-login-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0rem;
+  margin-top: 0.5rem;
+}
+
+.logo-image {
+  max-width: 350px;
+  width: auto;
+  max-height: 160px;
+  height: auto;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+}
+
+/* Title */
+.admin-login-title {
+  text-align: center;
+  font-size: var(--text-xl);
+  color: var(--text-white);
+  margin-bottom: 0.25rem;
+  padding-top: 20px;
+}
+
+/* Form */
+.admin-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-top: 1.5rem;
+  padding-top: 2px;
+}
+
+.admin-login-form .btn-primary {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+/* Forgot Password Link */
+.forgot-password-link {
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-transform: none;
+  letter-spacing: normal;
+  padding: 0;
+  min-height: auto;
+}
+
+.forgot-password-link:hover {
+  color: var(--gold);
+}
+
+/* Responsive */
+@media (max-width: 639px) {
+  .admin-login-page {
+    padding: 0.5rem;
+    align-items: flex-start;
+  }
+
+  .admin-login-container {
+    padding: 0.5rem 1.25rem 1.5rem;
+    margin-top: 30px;
+  }
+
+  .admin-login-title {
+    font-size: var(--text-lg);
+  }
+
+  .logo-image {
+    max-width: 280px;
+    max-height: 140px;
+  }
+  
+  .admin-login-logo {
+    margin-bottom: 0.5rem;
+    margin-top: 0.5rem;
+  }
+}
+
+@media (max-width: 374px) {
+  .admin-login-page {
+    padding: 1rem 0.5rem;
+  }
+
+  .admin-login-container {
+    padding: 1.5rem 1rem;
+  }
+}
