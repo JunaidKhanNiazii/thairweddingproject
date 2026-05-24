@@ -1,13 +1,6 @@
 import { initializeApp } from "firebase/app";
-import {
-  getFirestore,
-  collection,
-  addDoc,
-  getDocs,
-  doc,
-  updateDoc,
-  deleteDoc,
-} from "firebase/firestore";
+import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -20,21 +13,18 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+export const auth = getAuth(app);
 
-// CREATE - add a document to a collection
 export const addDocument = (collectionName, data) =>
   addDoc(collection(db, collectionName), data);
 
-// READ - get all documents from a collection
 export const getDocuments = async (collectionName) => {
   const snapshot = await getDocs(collection(db, collectionName));
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 };
 
-// UPDATE - update a document by id
 export const updateDocument = (collectionName, id, data) =>
   updateDoc(doc(db, collectionName, id), data);
 
-// DELETE - delete a document by id
 export const deleteDocument = (collectionName, id) =>
   deleteDoc(doc(db, collectionName, id));
