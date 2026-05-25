@@ -6,12 +6,16 @@ import Login from './pages/admin/AdminLogin';
 import Dashboard from './pages/admin/AdminDashboard';
 import CreateEvent from './pages/admin/CreateEvent';
 import EventDetail from './pages/admin/EventDetail';
+import EventPage from './pages/client/EventPage';
 
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <Routes>
+          {/* Public client route — no login needed */}
+          <Route path="/event/:slug" element={<EventPage />} />
+
           {/* Redirect root to admin login */}
           <Route path="/" element={<Navigate to="/admin/login" replace />} />
 

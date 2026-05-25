@@ -1,267 +1,217 @@
-import { useState, useRef } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { useAuth } from '../../context/AuthContext'
-import Navbar from '../../components/Navbar'
-import '../../styles/components.css'
-import './EventDetail.css'
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import Navbar from "../../components/Navbar";
+import { getEvent, getPhotos, savePhoto, deletePhoto, updateEvent } from "../../firebase";
+import { detectFacesFromFile, addFacesToSet } from "../../utils/faceApi";
+import "../../styles/components.css";
+import "./EventDetail.css";
+
+const APP_URL = import.meta.env.VITE_APP_URL || window.location.origin;
+
+// Convert File to base64
+const fileToBase64 = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 
 function EventDetail() {
-  const navigate = useNavigate()
-  const { user, logout } = useAuth()
-  const { eventId } = useParams()
-  const fileInputRef = useRef(null)
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const { eventId } = useParams();
+  const fileInputRef = useRef(null);
 
-  // TODO: Fetch event data from Firebase
-  const [event] = useState({
-    id: eventId || '1',
-    title: 'Riya & Arjun',
-    date: '14 February 2026',
-    shareLink: `anmollamhe.app/event/abc123`
-  })
+  const [event, setEvent] = useState(null);
+  const [photos, setPhotos] = useState([]);
+  const [uploading, setUploading] = useState([]);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [loadingEvent, setLoadingEvent] = useState(true);
 
-  const [uploadedPhotos, setUploadedPhotos] = useState([])
-
-  const [processingPhotos, setProcessingPhotos] = useState([])
-
-  const [copySuccess, setCopySuccess] = useState(false)
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const ev = await getEvent(eventId);
+        setEvent(ev);
+        const ph = await getPhotos(eventId);
+        setPhotos(ph);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoadingEvent(false);
+      }
+    };
+    load();
+  }, [eventId]);
 
   const handleLogout = async () => {
-    try {
-      await logout()
-      navigate('/admin/login', { replace: true })
-    } catch (error) {
-      console.error('Logout failed:', error)
-    }
-  }
+    await logout();
+    navigate("/admin/login", { replace: true });
+  };
 
-  const handleBack = () => {
-    navigate('/admin/dashboard')
-  }
+  const shareLink = event ? `${APP_URL}/event/${event.shareSlug}` : "";
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(`https://${event.shareLink}`)
-    setCopySuccess(true)
-    setTimeout(() => setCopySuccess(false), 2000)
-  }
+    navigator.clipboard.writeText(shareLink);
+    setCopySuccess(true);
+    setTimeout(() => setCopySuccess(false), 2000);
+  };
 
   const handleShareWhatsApp = () => {
-    const message = encodeURIComponent(`View photos from ${event.title}: https://${event.shareLink}`)
-    window.open(`https://wa.me/?text=${message}`, '_blank')
-  }
+    const msg = encodeURIComponent(`View your photos from ${event?.name}: ${shareLink}`);
+    window.open(`https://wa.me/?text=${msg}`, "_blank");
+  };
 
-  const handleFileSelect = (e) => {
-    const files = Array.from(e.target.files)
-    processFiles(files)
-  }
-
-  const handleDragOver = (e) => {
-    e.preventDefault()
-  }
-
-  const handleDrop = (e) => {
-    e.preventDefault()
-    const files = Array.from(e.dataTransfer.files)
-    processFiles(files)
-  }
+  const handleFileSelect = (e) => processFiles(Array.from(e.target.files));
+  const handleDrop = (e) => { e.preventDefault(); processFiles(Array.from(e.dataTransfer.files)); };
+  const handleDragOver = (e) => e.preventDefault();
 
   const processFiles = (files) => {
-    files.forEach((file, index) => {
-      if (!file.type.startsWith('image/')) {
-        return
+    files.filter((f) => f.type.startsWith("image/")).forEach(uploadPhoto);
+  };
+
+  const uploadPhoto = async (file) => {
+    const tempId = Date.now() + Math.random();
+
+    setUploading((prev) => [...prev, { id: tempId, name: file.name, progress: 0, status: "reading" }]);
+
+    try {
+      // 1. Convert to base64 for storage + preview
+      setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, status: "reading", progress: 30 } : u));
+      const base64 = await fileToBase64(file);
+
+      // 2. Detect faces directly from file
+      setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, status: "detecting", progress: 60 } : u));
+
+      let faceTokens = [];
+      try {
+        faceTokens = await detectFacesFromFile(file);
+        if (faceTokens.length > 0) {
+          await addFacesToSet(eventId, faceTokens);
+        }
+      } catch (faceErr) {
+        console.warn("Face detection failed:", faceErr.message);
       }
 
-      // Create a unique ID for this file
-      const fileId = Date.now() + index
+      // 3. Save to Firestore (base64 image + face tokens)
+      setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, status: "saving", progress: 85 } : u));
 
-      // Read file and create preview
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        // Add to uploaded photos immediately with preview
-        setUploadedPhotos(prev => [...prev, {
-          id: fileId,
-          url: reader.result,
-          name: file.name,
-          file: file
-        }])
+      const photoRef = await savePhoto(eventId, {
+        fileName: file.name,
+        imageData: base64,       // base64 stored in Firestore
+        faceTokens,
+        faceCount: faceTokens.length,
+      });
 
-        // Simulate processing
-        setProcessingPhotos(prev => [...prev, {
-          id: fileId,
-          name: file.name,
-          status: 'uploading',
-          progress: 0
-        }])
+      // 4. Update photoCount
+      await updateEvent(eventId, { photoCount: photos.length + 1 });
 
-        // Simulate upload progress
-        simulateUpload(fileId, file.name)
-      }
-      reader.readAsDataURL(file)
-    })
+      // 5. Add to local state
+      const newPhoto = {
+        id: photoRef.id,
+        fileName: file.name,
+        imageData: base64,
+        faceTokens,
+        faceCount: faceTokens.length,
+      };
+      setPhotos((prev) => [...prev, newPhoto]);
+
+      setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, status: "done", progress: 100, faceCount: faceTokens.length } : u));
+      setTimeout(() => setUploading((prev) => prev.filter((u) => u.id !== tempId)), 3000);
+
+    } catch (err) {
+      setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, status: "error", error: err.message } : u));
+    }
+  };
+
+  const handleDeletePhoto = async (photo) => {
+    try {
+      await deletePhoto(eventId, photo.id);
+      setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
+      await updateEvent(eventId, { photoCount: Math.max(0, photos.length - 1) });
+    } catch (err) {
+      console.error("Delete failed:", err);
+    }
+  };
+
+  if (loadingEvent) {
+    return (
+      <div className="event-detail-page" style={{ display: "flex", justifyContent: "center", padding: "100px 0" }}>
+        <span className="spinner"></span>
+      </div>
+    );
   }
 
-  const simulateUpload = (fileId, fileName) => {
-    let progress = 0
-    const interval = setInterval(() => {
-      progress += Math.random() * 30
-      if (progress >= 100) {
-        progress = 100
-        clearInterval(interval)
-        
-        // Mark as complete with random face count
-        setProcessingPhotos(prev => 
-          prev.map(p => 
-            p.id === fileId 
-              ? { ...p, status: 'complete', progress: 100, faces: Math.floor(Math.random() * 5) + 1 }
-              : p
-          )
-        )
-
-        // Remove from processing after 2 seconds
-        setTimeout(() => {
-          setProcessingPhotos(prev => prev.filter(p => p.id !== fileId))
-        }, 2000)
-      } else {
-        setProcessingPhotos(prev => 
-          prev.map(p => 
-            p.id === fileId 
-              ? { ...p, progress: Math.floor(progress) }
-              : p
-          )
-        )
-      }
-    }, 500)
-  }
-
-  const handleDeletePhoto = (photoId) => {
-    // TODO: Implement delete from Firebase
-    setUploadedPhotos(prev => prev.filter(p => p.id !== photoId))
-  }
-
-  const handleBrowseClick = () => {
-    fileInputRef.current?.click()
+  if (!event) {
+    return (
+      <div className="event-detail-page">
+        <p style={{ color: "var(--text-primary)", textAlign: "center", padding: "100px 0" }}>Event not found.</p>
+      </div>
+    );
   }
 
   return (
     <div className="event-detail-page">
-      <Navbar userEmail={user?.email || 'admin@example.com'} onLogout={handleLogout} />
-      
-      {/* Back Button */}
+      <Navbar userEmail={user?.email} onLogout={handleLogout} />
       <div className="back-button-container">
-        <button 
-          onClick={handleBack}
-          className="back-button"
-          type="button"
-        >
-          ← Events
-        </button>
+        <button onClick={() => navigate("/admin/dashboard")} className="back-button" type="button">← Events</button>
       </div>
-      
       <div className="event-detail-container">
-        {/* Event Header */}
         <div className="event-header">
-          <h1 className="event-title brand-title">{event.title}</h1>
+          <h1 className="event-title brand-title">{event.name}</h1>
           <p className="event-date">{event.date}</p>
           <div className="title-underline"></div>
         </div>
 
-        {/* Shareable Link Section */}
+        {/* Shareable Link */}
         <section className="share-section">
           <h2 className="section-title label-text">SHAREABLE LINK</h2>
           <div className="share-link-container">
-            <input 
-              type="text" 
-              value={event.shareLink} 
-              readOnly 
-              className="share-link-input"
-            />
-            <button 
-              onClick={handleCopyLink}
-              className="btn btn-secondary btn-copy"
-            >
-              {copySuccess ? 'COPIED!' : 'COPY'}
+            <input type="text" value={shareLink} readOnly className="share-link-input" />
+            <button onClick={handleCopyLink} className="btn btn-secondary btn-copy">
+              {copySuccess ? "COPIED!" : "COPY"}
             </button>
           </div>
-          <button 
-            onClick={handleShareWhatsApp}
-            className="btn btn-secondary btn-whatsapp"
-          >
+          <button onClick={handleShareWhatsApp} className="btn btn-secondary btn-whatsapp">
             Share on WhatsApp
           </button>
         </section>
 
-        {/* Upload Section */}
+        {/* Upload */}
         <section className="upload-section">
           <h2 className="section-title label-text">UPLOAD PHOTOS</h2>
-          <div 
-            className="upload-dropzone"
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-            onClick={handleBrowseClick}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept="image/*"
-              onChange={handleFileSelect}
-              className="upload-input"
-            />
+          <div className="upload-dropzone" onDragOver={handleDragOver} onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}>
+            <input ref={fileInputRef} type="file" multiple accept="image/*"
+              onChange={handleFileSelect} className="upload-input" />
             <div className="upload-content">
               <span className="upload-icon">⤒</span>
               <p className="upload-text">Drag photos here or click to browse</p>
-              <p className="upload-hint">JPG · PNG · up to 50 MB each</p>
+              <p className="upload-hint">JPG · PNG · up to 20 MB each</p>
             </div>
           </div>
         </section>
 
-        {/* Uploaded Photos Section */}
-        {uploadedPhotos.length > 0 && (
-          <section className="uploaded-section">
-            <h2 className="section-title label-text">UPLOADED ({uploadedPhotos.length})</h2>
-            <div className="photo-grid">
-              {uploadedPhotos.map(photo => (
-                <div key={photo.id} className="photo-thumbnail">
-                  <div className="photo-thumbnail-inner">
-                    <img 
-                      src={photo.url} 
-                      alt={photo.name}
-                      className="photo-image"
-                    />
-                    <button 
-                      onClick={() => handleDeletePhoto(photo.id)}
-                      className="photo-delete"
-                      aria-label="Delete photo"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Processing Section */}
-        {processingPhotos.length > 0 && (
+        {/* Processing */}
+        {uploading.length > 0 && (
           <section className="processing-section">
             <h2 className="section-title label-text">PROCESSING</h2>
             <div className="processing-list">
-              {processingPhotos.map(photo => (
-                <div key={photo.id} className="processing-item">
-                  <span className="processing-name">{photo.name}</span>
-                  {photo.status === 'complete' ? (
-                    <span className="processing-status success">
-                      ✓ Faces detected ({photo.faces})
-                    </span>
-                  ) : (
+              {uploading.map((u) => (
+                <div key={u.id} className="processing-item">
+                  <span className="processing-name">{u.name}</span>
+                  {u.status === "done" && <span className="processing-status success">✓ Faces detected ({u.faceCount})</span>}
+                  {u.status === "detecting" && <span className="processing-status">🔍 Detecting faces...</span>}
+                  {u.status === "saving" && <span className="processing-status">💾 Saving...</span>}
+                  {u.status === "error" && <span className="processing-status error">✗ {u.error}</span>}
+                  {(u.status === "reading" || u.status === "uploading") && (
                     <div className="processing-progress">
                       <div className="progress-bar">
-                        <div 
-                          className="progress-fill" 
-                          style={{ width: `${photo.progress}%` }}
-                        ></div>
+                        <div className="progress-fill" style={{ width: `${u.progress}%` }}></div>
                       </div>
-                      <span className="progress-text">{photo.progress}% uploading</span>
+                      <span className="progress-text">{u.progress}%</span>
                     </div>
                   )}
                 </div>
@@ -269,9 +219,27 @@ function EventDetail() {
             </div>
           </section>
         )}
+
+        {/* Uploaded Photos */}
+        {photos.length > 0 && (
+          <section className="uploaded-section">
+            <h2 className="section-title label-text">UPLOADED ({photos.length})</h2>
+            <div className="photo-grid">
+              {photos.map((photo) => (
+                <div key={photo.id} className="photo-thumbnail">
+                  <div className="photo-thumbnail-inner">
+                    <img src={photo.imageData} alt={photo.fileName} className="photo-image" loading="lazy" />
+                    <button onClick={() => handleDeletePhoto(photo)} className="photo-delete" aria-label="Delete photo">✕</button>
+                    {photo.faceCount > 0 && <span className="photo-face-badge">{photo.faceCount} 👤</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </div>
-  )
+  );
 }
 
-export default EventDetail
+export default EventDetail;

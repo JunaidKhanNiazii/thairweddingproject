@@ -1,171 +1,127 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../../context/AuthContext'
-import Navbar from '../../components/Navbar'
-import '../../styles/components.css'
-import './CreateEvent.css'
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import Navbar from "../../components/Navbar";
+import { createEvent, updateEvent } from "../../firebase";
+import { createFaceSet } from "../../utils/faceApi";
+import "../../styles/components.css";
+import "./CreateEvent.css";
+
+const generateSlug = () => Math.random().toString(36).substring(2, 10);
+
+// Convert file to base64 string
+const fileToBase64 = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 
 function CreateEvent() {
-  const navigate = useNavigate()
-  const { user, logout } = useAuth()
-  const [formData, setFormData] = useState({
-    eventName: '',
-    eventDate: '',
-    coverImage: null
-  })
-  const [coverImagePreview, setcoverImagePreview] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const [formData, setFormData] = useState({ eventName: "", eventDate: "", coverImage: null });
+  const [coverPreview, setCoverPreview] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleLogout = async () => {
-    try {
-      await logout()
-      navigate('/admin/login', { replace: true })
-    } catch (error) {
-      console.error('Logout failed:', error)
-    }
-  }
+    await logout();
+    navigate("/admin/login", { replace: true });
+  };
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }))
-  }
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
 
   const handleImageUpload = (e) => {
-    const file = e.target.files[0]
-    if (file) {
-      if (!file.type.startsWith('image/')) {
-        setError('Please upload an image file')
-        return
-      }
-      setFormData(prev => ({ ...prev, coverImage: file }))
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setcoverImagePreview(reader.result)
-      }
-      reader.readAsDataURL(file)
-      setError('')
-    }
-  }
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { setError("Please upload an image file"); return; }
+    setFormData((prev) => ({ ...prev, coverImage: file }));
+    const reader = new FileReader();
+    reader.onloadend = () => setCoverPreview(reader.result);
+    reader.readAsDataURL(file);
+    setError("");
+  };
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError('')
-
-    if (!formData.eventName.trim()) {
-      setError('Event name is required')
-      return
-    }
-
-    if (!formData.eventDate) {
-      setError('Event date is required')
-      return
-    }
-
-    setLoading(true)
+    e.preventDefault();
+    setError("");
+    if (!formData.eventName.trim()) { setError("Event name is required"); return; }
+    if (!formData.eventDate) { setError("Event date is required"); return; }
+    setLoading(true);
 
     try {
-      // TODO: Implement Firebase event creation
-      console.log('Creating event:', formData)
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // Navigate back to dashboard
-      navigate('/admin/dashboard')
-    } catch (err) {
-      setError(err.message || 'Failed to create event')
-    } finally {
-      setLoading(false)
-    }
-  }
+      const slug = generateSlug();
 
-  const handleCancel = () => {
-    navigate('/admin/dashboard')
-  }
+      // 1. Create event in Firestore
+      const eventId = await createEvent({
+        name: formData.eventName.trim(),
+        date: formData.eventDate,
+        coverUrl: null,
+        shareSlug: slug,
+        ownerUid: user.uid,
+      });
+
+      // 2. Save cover as base64 in Firestore (no Storage yet)
+      if (formData.coverImage) {
+        const base64 = await fileToBase64(formData.coverImage);
+        await updateEvent(eventId, { coverUrl: base64 });
+      }
+
+      // 3. Create FaceSet on Face++ for this event
+      try {
+        await createFaceSet(eventId);
+      } catch (faceErr) {
+        console.warn("FaceSet creation failed:", faceErr.message);
+      }
+
+      navigate("/admin/dashboard");
+    } catch (err) {
+      setError(err.message || "Failed to create event");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="create-event-page">
-      <Navbar userEmail={user?.email || 'admin@example.com'} onLogout={handleLogout} />
-      
-      {/* Back Button */}
+      <Navbar userEmail={user?.email} onLogout={handleLogout} />
       <div className="back-button-container">
-        <button 
-          onClick={handleCancel}
-          className="back-button"
-          type="button"
-        >
+        <button onClick={() => navigate("/admin/dashboard")} className="back-button" type="button">
           ← Back to events
         </button>
       </div>
-      
       <div className="create-event-container">
-        {/* Title */}
         <div className="create-event-header">
           <h1 className="create-event-title brand-title">CREATE NEW EVENT</h1>
           <div className="title-underline"></div>
         </div>
-
-        {/* Form */}
         <form className="create-event-form" onSubmit={handleSubmit}>
-          {/* Event Name */}
           <div className="input-group">
-            <label htmlFor="eventName" className="input-label">
-              Event Name
-            </label>
-            <input
-              id="eventName"
-              name="eventName"
-              type="text"
-              className="input-field"
-              placeholder="e.g. Riya & Arjun Wedding"
-              value={formData.eventName}
-              onChange={handleInputChange}
-              disabled={loading}
-              autoComplete="off"
-            />
+            <label htmlFor="eventName" className="input-label">Event Name</label>
+            <input id="eventName" name="eventName" type="text" className="input-field"
+              placeholder="e.g. Riya & Arjun Wedding" value={formData.eventName}
+              onChange={handleInputChange} disabled={loading} autoComplete="off" />
           </div>
-
-          {/* Event Date */}
           <div className="input-group">
-            <label htmlFor="eventDate" className="input-label">
-              Event Date
-            </label>
-            <input
-              id="eventDate"
-              name="eventDate"
-              type="date"
-              className="input-field"
-              value={formData.eventDate}
-              onChange={handleInputChange}
-              disabled={loading}
-            />
+            <label htmlFor="eventDate" className="input-label">Event Date</label>
+            <input id="eventDate" name="eventDate" type="date" className="input-field"
+              value={formData.eventDate} onChange={handleInputChange} disabled={loading} />
           </div>
-
-          {/* Cover Image */}
           <div className="input-group">
-            <label htmlFor="coverImage" className="input-label">
-              Cover Image (optional)
-            </label>
+            <label htmlFor="coverImage" className="input-label">Cover Image (optional)</label>
             <div className="upload-area">
-              <input
-                id="coverImage"
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                disabled={loading}
-                className="upload-input"
-              />
+              <input id="coverImage" type="file" accept="image/*" onChange={handleImageUpload}
+                disabled={loading} className="upload-input" />
               <label htmlFor="coverImage" className="upload-label">
-                {coverImagePreview ? (
+                {coverPreview ? (
                   <div className="upload-preview">
-                    <img src={coverImagePreview} alt="Cover preview" />
-                    <div className="upload-overlay">
-                      <span>⤒ Click to change</span>
-                    </div>
+                    <img src={coverPreview} alt="Cover preview" />
+                    <div className="upload-overlay"><span>⤒ Click to change</span></div>
                   </div>
                 ) : (
                   <div className="upload-placeholder">
@@ -176,43 +132,18 @@ function CreateEvent() {
               </label>
             </div>
           </div>
-
-          {/* Error Message */}
-          {error && (
-            <div className="error-message" role="alert">
-              {error}
-            </div>
-          )}
-
-          {/* Action Buttons */}
+          {error && <div className="error-message" role="alert">{error}</div>}
           <div className="form-actions">
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="btn btn-secondary btn-cancel"
-              disabled={loading}
-            >
-              CANCEL
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary btn-submit"
-              disabled={loading}
-            >
-              {loading ? (
-                <>
-                  <span className="spinner spinner-small"></span>
-                  CREATING...
-                </>
-              ) : (
-                'CREATE EVENT'
-              )}
+            <button type="button" onClick={() => navigate("/admin/dashboard")}
+              className="btn btn-secondary btn-cancel" disabled={loading}>CANCEL</button>
+            <button type="submit" className="btn btn-primary btn-submit" disabled={loading}>
+              {loading ? <><span className="spinner spinner-small"></span>CREATING...</> : "CREATE EVENT"}
             </button>
           </div>
         </form>
       </div>
     </div>
-  )
+  );
 }
 
-export default CreateEvent
+export default CreateEvent;

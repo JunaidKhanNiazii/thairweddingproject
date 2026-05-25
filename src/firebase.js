@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { getFirestore, collection, addDoc, getDocs, getDoc, doc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
@@ -15,16 +15,48 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 
-export const addDocument = (collectionName, data) =>
-  addDoc(collection(db, collectionName), data);
+// ─── EVENTS ───────────────────────────────────────────────
 
-export const getDocuments = async (collectionName) => {
-  const snapshot = await getDocs(collection(db, collectionName));
+export const createEvent = async (data) => {
+  const ref = await addDoc(collection(db, "events"), {
+    ...data,
+    photoCount: 0,
+    createdAt: serverTimestamp(),
+  });
+  return ref.id;
+};
+
+export const getEvents = async () => {
+  const snapshot = await getDocs(collection(db, "events"));
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 };
 
-export const updateDocument = (collectionName, id, data) =>
-  updateDoc(doc(db, collectionName, id), data);
+export const getEvent = async (eventId) => {
+  const snap = await getDoc(doc(db, "events", eventId));
+  if (!snap.exists()) return null;
+  return { id: snap.id, ...snap.data() };
+};
 
-export const deleteDocument = (collectionName, id) =>
-  deleteDoc(doc(db, collectionName, id));
+export const updateEvent = (eventId, data) =>
+  updateDoc(doc(db, "events", eventId), data);
+
+export const deleteEvent = (eventId) =>
+  deleteDoc(doc(db, "events", eventId));
+
+// ─── PHOTOS ───────────────────────────────────────────────
+
+// Save photo metadata + face tokens to Firestore
+// imageDataUrl: base64 data URL of the image (stored in Firestore until Storage is added)
+export const savePhoto = (eventId, data) =>
+  addDoc(collection(db, "events", eventId, "photos"), {
+    ...data,
+    uploadedAt: serverTimestamp(),
+  });
+
+export const getPhotos = async (eventId) => {
+  const snapshot = await getDocs(collection(db, "events", eventId, "photos"));
+  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+};
+
+export const deletePhoto = (eventId, photoId) =>
+  deleteDoc(doc(db, "events", eventId, "photos", photoId));
