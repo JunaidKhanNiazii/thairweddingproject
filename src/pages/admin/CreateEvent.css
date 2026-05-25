@@ -7,17 +7,10 @@
   background-color: var(--bg-primary);
 }
 
-/* Back Button Container */
-.back-button-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 1.5rem 1rem 0 1rem;
-}
-
 .create-event-container {
   max-width: 600px;
   margin: 0 auto;
-  padding: 2rem 1rem;
+  padding: 2rem 1rem 2rem 1rem;
 }
 
 /* Back Button */
@@ -29,6 +22,7 @@
   font-weight: 500;
   cursor: pointer;
   padding: 0.5rem 0;
+  margin-bottom: 2rem;
   transition: color 300ms ease;
   display: inline-flex;
   align-items: center;
@@ -182,8 +176,12 @@ input[type="date"].input-field::-webkit-calendar-picker-indicator {
 
 /* Responsive */
 @media (max-width: 639px) {
-  .create-event-page {
-    padding: 1.5rem 0;
+  .create-event-container {
+    padding: 1.5rem 1rem 2rem 1rem;
+  }
+
+  .back-button {
+    margin-bottom: 1.5rem;
   }
 
   .create-event-header {
@@ -225,6 +223,34 @@ input[type="date"].input-field::-webkit-calendar-picker-indicator {
 
 @media (min-width: 640px) and (max-width: 1023px) {
   .create-event-container {
-    padding: 0 2rem;
+    padding: 2rem 2rem 2rem 2rem;
+  }
+
+  .back-button {
+    position: absolute;
+    left: 2rem;
+    top: 120px;
+    margin-bottom: 0;
+  }
+
+  .create-event-header {
+    margin-bottom: 3rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .create-event-container {
+    padding: 2rem 1rem 2rem 1rem;
+  }
+
+  .back-button {
+    position: absolute;
+    left: 3rem;
+    top: 120px;
+    margin-bottom: 0;
+  }
+
+  .create-event-header {
+    margin-bottom: 3rem;
   }
 }

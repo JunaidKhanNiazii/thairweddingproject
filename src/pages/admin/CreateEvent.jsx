@@ -90,12 +90,10 @@ function CreateEvent() {
   return (
     <div className="create-event-page">
       <Navbar userEmail={user?.email} onLogout={handleLogout} />
-      <div className="back-button-container">
+      <div className="create-event-container">
         <button onClick={() => navigate("/admin/dashboard")} className="back-button" type="button">
           ← Back to events
         </button>
-      </div>
-      <div className="create-event-container">
         <div className="create-event-header">
           <h1 className="create-event-title brand-title">CREATE NEW EVENT</h1>
           <div className="title-underline"></div>
