@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { db } from "../../firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 
 export default function EventPage() {
   const { slug } = useParams();
+  const navigate = useNavigate();
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -48,42 +49,94 @@ export default function EventPage() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0B0B0B", fontFamily: "Montserrat, sans-serif" }}>
+    <div style={{ minHeight: "100vh", maxHeight: "100vh", background: "#0B0B0B", fontFamily: "Montserrat, sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      {/* Logo */}
+      <div style={{ textAlign: "center", padding: "0 0 5px 0", margin: 0 }}>
+        <img 
+          src="/logo.png" 
+          alt="Anmol Lamhe Photography" 
+          style={{ height: "90px", width: "auto", objectFit: "contain", display: "block", margin: "0 auto" }}
+        />
+      </div>
+
+      {/* Cover Image */}
       {event.coverUrl && (
-        <div style={{ width: "100%", height: 320, overflow: "hidden", position: "relative" }}>
+        <div style={{ width: "100%", height: "200px", overflow: "hidden", flexShrink: 0 }}>
           <img src={event.coverUrl} alt={event.name}
-            style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.7 }} />
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 40%, #0B0B0B 100%)" }} />
+            style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
       )}
-      <div style={{ maxWidth: 480, margin: "0 auto", padding: "60px 24px", textAlign: "center" }}>
-        <div style={{ width: 48, height: 48, background: "linear-gradient(135deg, #E8C77A, #8C6E2B)", borderRadius: 8, margin: "0 auto 32px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <span style={{ color: "#0B0B0B", fontWeight: 800, fontSize: 20 }}>A</span>
-        </div>
-        <h1 style={{ fontFamily: "Cinzel, serif", color: "#F5F0E6", fontSize: "clamp(1.5rem, 5vw, 2.5rem)", letterSpacing: "0.18em", textTransform: "uppercase", margin: "0 0 12px" }}>
-          {event.name}
-        </h1>
-        <p style={{ color: "#9A9A9A", fontSize: 13, letterSpacing: "0.3em", textTransform: "uppercase", marginBottom: 48 }}>
-          {event.date}
-        </p>
-        <p style={{ color: "#C9A961", fontSize: 13, letterSpacing: "0.15em", marginBottom: 32 }}>
-          ⌐ Find your photos in seconds ⌐
-        </p>
-        <button
-          style={{
-            background: "linear-gradient(135deg, #E8C77A 0%, #C9A961 50%, #8C6E2B 100%)",
-            color: "#0B0B0B", fontFamily: "Montserrat, sans-serif", fontWeight: 700,
-            fontSize: 13, letterSpacing: "0.2em", textTransform: "uppercase",
-            padding: "16px 40px", border: "none", borderRadius: 6, cursor: "pointer",
-            boxShadow: "0 0 24px rgba(201,169,97,0.25)", width: "100%", maxWidth: 320,
+
+      {/* Content */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", padding: "1.5rem 1.5rem", textAlign: "center" }}>
+        {/* Card Container */}
+        <div 
+          style={{ 
+            background: "#1A1A1A", 
+            border: "1px solid rgba(201, 169, 97, 0.15)", 
+            borderRadius: "12px", 
+            padding: "2rem 1.5rem", 
+            width: "100%", 
+            maxWidth: "480px",
+            boxShadow: "0 10px 40px rgba(0, 0, 0, 0.45)",
+            transition: "all 300ms ease"
           }}
-          onClick={() => alert("Selfie upload coming soon!")}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = "#C9A961";
+            e.currentTarget.style.boxShadow = "0 0 24px rgba(201, 169, 97, 0.25)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = "rgba(201, 169, 97, 0.15)";
+            e.currentTarget.style.boxShadow = "0 10px 40px rgba(0, 0, 0, 0.45)";
+          }}
         >
-          FIND MY PHOTOS →
-        </button>
-        <p style={{ color: "#2A2A2A", fontSize: 11, marginTop: 48, letterSpacing: "0.1em" }}>
-          Powered by Anmol Lamhe Photography
-        </p>
+          {/* Event Name */}
+          <h1 style={{ fontFamily: "Cinzel, serif", color: "#F5F0E6", fontSize: "clamp(1.5rem, 5vw, 2rem)", letterSpacing: "0.18em", textTransform: "uppercase", margin: "0 0 1rem", fontWeight: 600 }}>
+            {event.name}
+          </h1>
+
+          {/* Date with lines */}
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.5rem", justifyContent: "center" }}>
+            <div style={{ width: "60px", height: "1px", background: "#C9A961" }}></div>
+            <p style={{ color: "#9A9A9A", fontSize: "0.875rem", letterSpacing: "0.15em", textTransform: "uppercase", margin: 0, whiteSpace: "nowrap" }}>
+              {event.date}
+            </p>
+            <div style={{ width: "60px", height: "1px", background: "#C9A961" }}></div>
+          </div>
+
+          {/* Tagline */}
+          <p style={{ color: "#C9A961", fontSize: "0.875rem", letterSpacing: "0.1em", marginBottom: "1.5rem" }}>
+            ⌐ Find your photos in seconds ⌐
+          </p>
+
+          {/* Button */}
+          <button
+            style={{
+              background: "linear-gradient(135deg, #E8C77A 0%, #C9A961 50%, #8C6E2B 100%)",
+              color: "#0B0B0B", fontFamily: "Montserrat, sans-serif", fontWeight: 700,
+              fontSize: "0.875rem", letterSpacing: "0.2em", textTransform: "uppercase",
+              padding: "16px 40px", border: "none", borderRadius: 6, cursor: "pointer",
+              boxShadow: "0 0 24px rgba(201,169,97,0.25)", width: "100%",
+              transition: "transform 300ms ease, box-shadow 300ms ease"
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.transform = "translateY(-2px)";
+              e.target.style.boxShadow = "0 0 36px rgba(201,169,97,0.45)";
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = "translateY(0)";
+              e.target.style.boxShadow = "0 0 24px rgba(201,169,97,0.25)";
+            }}
+            onClick={() => navigate(`/event/${slug}/upload`)}
+          >
+            FIND MY PHOTOS →
+          </button>
+
+          {/* Footer */}
+          <p style={{ color: "#F5F0E6", fontSize: "0.75rem", marginTop: "1.5rem", letterSpacing: "0.05em", margin: "1.5rem 0 0 0" }}>
+            Powered by Anmol Lamhe Photography
+          </p>
+        </div>
       </div>
     </div>
   );

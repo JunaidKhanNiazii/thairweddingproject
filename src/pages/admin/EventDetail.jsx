@@ -155,14 +155,15 @@ function EventDetail() {
   return (
     <div className="event-detail-page">
       <Navbar userEmail={user?.email} onLogout={handleLogout} />
-      <div className="back-button-container">
-        <button onClick={() => navigate("/admin/dashboard")} className="back-button" type="button">← Events</button>
-      </div>
       <div className="event-detail-container">
+        <button onClick={() => navigate("/admin/dashboard")} className="back-button" type="button">← Back to Events</button>
+        {/* Event Header */}
         <div className="event-header">
-          <h1 className="event-title brand-title">{event.name}</h1>
+          <div className="event-header-content">
+            <h1 className="event-title brand-title">{event.name}</h1>
+            <div className="title-underline"></div>
+          </div>
           <p className="event-date">{event.date}</p>
-          <div className="title-underline"></div>
         </div>
 
         {/* Shareable Link */}

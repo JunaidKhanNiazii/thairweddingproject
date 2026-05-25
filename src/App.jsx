@@ -7,14 +7,18 @@ import Dashboard from './pages/admin/AdminDashboard';
 import CreateEvent from './pages/admin/CreateEvent';
 import EventDetail from './pages/admin/EventDetail';
 import EventPage from './pages/client/EventPage';
+import UploadSelfie from './pages/client/UploadSelfie';
+import Results from './pages/client/Results';
 
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          {/* Public client route — no login needed */}
+          {/* Public client routes — no login needed */}
           <Route path="/event/:slug" element={<EventPage />} />
+          <Route path="/event/:slug/upload" element={<UploadSelfie />} />
+          <Route path="/event/:slug/results" element={<Results />} />
 
           {/* Redirect root to admin login */}
           <Route path="/" element={<Navigate to="/admin/login" replace />} />
