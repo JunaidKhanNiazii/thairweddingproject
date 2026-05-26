@@ -55,6 +55,10 @@ export default async function handler(req, res) {
       });
     }
 
+    if (searchData.error_message === "EMPTY_FACESET") {
+      return res.status(200).json({ results: [] });
+    }
+
     if (searchData.error_message) {
       return res.status(400).json({ error: searchData.error_message });
     }

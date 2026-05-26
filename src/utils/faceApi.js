@@ -25,18 +25,9 @@ export const createFaceSet = async (eventId) => {
 };
 
 // ─── DETECT from URL ─────────────────────────────────────
-// Used when photo is uploaded to Storage — detect via URL
+// Used when photo is uploaded to Storage — send URL to proxy, server fetches it
 export const detectFaces = async (imageUrl) => {
-  // For Storage URLs we still need to go through proxy
-  // Fetch the image and convert to base64
-  const res = await fetch(imageUrl);
-  const blob = await res.blob();
-  const base64 = await new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result);
-    reader.readAsDataURL(blob);
-  });
-  const data = await post("face-detect", { imageBase64: base64 });
+  const data = await post("face-detect", { imageUrl });
   if (data.error_message) throw new Error(data.error_message);
   return (data.faces || []).map((f) => f.face_token);
 };
