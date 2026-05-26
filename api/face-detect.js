@@ -44,6 +44,8 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
+    // Small delay so next Face++ call doesn't hit concurrency limit
+    await new Promise((r) => setTimeout(r, 1200));
     return res.status(200).json(data);
   } catch (err) {
     return res.status(500).json({ error: err.message });

@@ -1,5 +1,7 @@
 // Proxy: search a face token against an event FaceSet via Face++
-// If FaceSet doesn't exist, creates it and rebuilds from faceTokens passed in
+// Auto-creates FaceSet if missing and rebuilds from existing tokens
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
@@ -19,30 +21,33 @@ export default async function handler(req, res) {
   };
 
   try {
-    // Try to search directly first
+    // Wait before first call to avoid overlap with detect call
+    await sleep(1200);
+
+    // Try search first
     let searchData = await post(`${BASE}/search`, {
       outer_id: eventId,
       face_token: faceToken,
       return_result_count: 100,
     });
 
-    // If FaceSet doesn't exist, create it and populate with all known face tokens
+    // If FaceSet doesn't exist, create it and populate
     if (searchData.error_message === "INVALID_OUTER_ID") {
-      // Create the FaceSet
+      await sleep(1200);
       await post(`${BASE}/faceset/create`, {
         outer_id: eventId,
         display_name: eventId,
       });
 
-      // Add all face tokens from existing photos in one call (max 1000 per call on free tier)
       if (allFaceTokens.length > 0) {
+        await sleep(1200);
         await post(`${BASE}/faceset/addface`, {
           outer_id: eventId,
           face_tokens: allFaceTokens.slice(0, 1000).join(","),
         });
       }
 
-      // Retry search
+      await sleep(1200);
       searchData = await post(`${BASE}/search`, {
         outer_id: eventId,
         face_token: faceToken,
