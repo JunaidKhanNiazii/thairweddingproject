@@ -94,10 +94,10 @@ export const compareFaces = (descriptor1, descriptor2) => {
  * Find matching faces in a collection
  * @param {File} selfieFile - User's selfie
  * @param {Array} photoDescriptors - Array of {photoId, descriptors: [...]}
- * @param {number} threshold - Match threshold (default 0.6, lower = stricter)
+ * @param {number} threshold - Match threshold (default 0.5, lower = stricter)
  * @returns {Promise<Array>} Array of matching photo IDs with confidence
  */
-export const findMatches = async (selfieFile, photoDescriptors, threshold = 0.6) => {
+export const findMatches = async (selfieFile, photoDescriptors, threshold = 0.5) => {
   await loadModels();
   
   try {
@@ -128,8 +128,8 @@ export const findMatches = async (selfieFile, photoDescriptors, threshold = 0.6)
         console.log(`  Distance: ${distance.toFixed(4)} (threshold: ${threshold})`);
         
         if (distance < threshold) {
-          // Convert distance to confidence percentage (0.6 = 0%, 0 = 100%)
-          const confidence = Math.max(0, Math.min(100, (1 - distance / 0.6) * 100));
+          // Convert distance to confidence percentage (0.5 = 0%, 0 = 100%)
+          const confidence = Math.max(0, Math.min(100, (1 - distance / 0.5) * 100));
           
           console.log(`  ✅ MATCH! Confidence: ${confidence.toFixed(2)}%`);
           
