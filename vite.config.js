@@ -8,4 +8,13 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  server: {
+    proxy: {
+      '/facepp-api': {
+        target: 'https://api-us.faceplusplus.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/facepp-api/, '/facepp/v3'),
+      }
+    }
+  }
 })

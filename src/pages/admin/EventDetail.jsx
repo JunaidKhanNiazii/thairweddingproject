@@ -74,7 +74,7 @@ function EventDetail() {
       // 2. Detect faces via Face++ using the Storage URL
       setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, status: "detecting", progress: 100 } : u));
 
-      let faceTokens = [];
+      let faceDescriptors = [];
       try {
         faceTokens = await detectFaces(downloadUrl);
         if (faceTokens.length > 0) {
