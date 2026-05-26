@@ -2,21 +2,12 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import Navbar from "../../components/Navbar";
-import { createEvent, updateEvent } from "../../firebase";
+import { createEvent, uploadFile, updateEvent } from "../../firebase";
 import { createFaceSet } from "../../utils/faceApi";
 import "../../styles/components.css";
 import "./CreateEvent.css";
 
 const generateSlug = () => Math.random().toString(36).substring(2, 10);
-
-// Convert file to base64 string
-const fileToBase64 = (file) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 
 function CreateEvent() {
   const navigate = useNavigate();
@@ -66,10 +57,13 @@ function CreateEvent() {
         ownerUid: user.uid,
       });
 
-      // 2. Save cover as base64 in Firestore (no Storage yet)
+      // 2. Upload cover to Firebase Storage
       if (formData.coverImage) {
-        const base64 = await fileToBase64(formData.coverImage);
-        await updateEvent(eventId, { coverUrl: base64 });
+        const coverUrl = await uploadFile(
+          `events/${eventId}/cover/cover.jpg`,
+          formData.coverImage
+        );
+        await updateEvent(eventId, { coverUrl });
       }
 
       // 3. Create FaceSet on Face++ for this event
@@ -90,10 +84,12 @@ function CreateEvent() {
   return (
     <div className="create-event-page">
       <Navbar userEmail={user?.email} onLogout={handleLogout} />
-      <div className="create-event-container">
+      <div className="back-button-container">
         <button onClick={() => navigate("/admin/dashboard")} className="back-button" type="button">
           ← Back to events
         </button>
+      </div>
+      <div className="create-event-container">
         <div className="create-event-header">
           <h1 className="create-event-title brand-title">CREATE NEW EVENT</h1>
           <div className="title-underline"></div>

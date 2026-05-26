@@ -37,7 +37,21 @@ export const createFaceSet = async (eventId) => {
 };
 
 // ─── DETECT ───────────────────────────────────────────────
-// Detect faces in a File object, returns array of face_tokens
+// Detect faces from a Firebase Storage URL, returns array of face_tokens
+
+export const detectFaces = async (imageUrl) => {
+  const form = new FormData();
+  form.append("api_key", API_KEY);
+  form.append("api_secret", API_SECRET);
+  form.append("image_url", imageUrl);
+  form.append("return_attributes", "none");
+  const res = await fetch(`${BASE_URL}/detect`, { method: "POST", body: form });
+  const data = await res.json();
+  if (data.error_message) throw new Error(data.error_message);
+  return (data.faces || []).map((f) => f.face_token);
+};
+
+// Detect faces from a File object (for selfie upload)
 
 export const detectFacesFromFile = async (file) => {
   const form = new FormData();
