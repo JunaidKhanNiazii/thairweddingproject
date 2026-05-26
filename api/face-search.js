@@ -34,19 +34,12 @@ export default async function handler(req, res) {
         display_name: eventId,
       });
 
-      // Add all face tokens from existing photos (passed from client)
+      // Add all face tokens from existing photos in one call (max 1000 per call on free tier)
       if (allFaceTokens.length > 0) {
-        // Face++ allows max 5 tokens per addface call
-        const chunks = [];
-        for (let i = 0; i < allFaceTokens.length; i += 5) {
-          chunks.push(allFaceTokens.slice(i, i + 5));
-        }
-        for (const chunk of chunks) {
-          await post(`${BASE}/faceset/addface`, {
-            outer_id: eventId,
-            face_tokens: chunk.join(","),
-          });
-        }
+        await post(`${BASE}/faceset/addface`, {
+          outer_id: eventId,
+          face_tokens: allFaceTokens.slice(0, 1000).join(","),
+        });
       }
 
       // Retry search
