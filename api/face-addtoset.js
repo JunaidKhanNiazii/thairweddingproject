@@ -3,8 +3,8 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
 
   const { eventId, faceTokens } = req.body;
-  const API_KEY = process.env.VITE_FACEPP_API_KEY;
-  const API_SECRET = process.env.VITE_FACEPP_API_SECRET;
+  const API_KEY = process.env.FACEPP_API_KEY;
+  const API_SECRET = process.env.FACEPP_API_SECRET;
 
   try {
     const form = new URLSearchParams();
