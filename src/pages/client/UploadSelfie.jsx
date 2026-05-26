@@ -50,12 +50,12 @@ export default function UploadSelfie() {
     setError(null);
 
     try {
-      // 1. Search selfie against event FaceSet on Face++
-      const matches = await searchFace(event.id, selectedImage);
-
-      // 2. Load all photos for this event from Firestore
+      // 1. Load all photos for this event from Firestore first
       const photosSnap = await getDocs(collection(db, "events", event.id, "photos"));
       const allPhotos = photosSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+      // 2. Search selfie against event FaceSet, passing all known tokens for auto-rebuild
+      const matches = await searchFace(event.id, selectedImage, allPhotos);
 
       // 3. Find photos whose faceTokens overlap with matched tokens
       const matchedTokens = new Set(matches.map((m) => m.faceToken));

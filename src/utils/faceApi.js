@@ -59,13 +59,16 @@ export const addFacesToSet = async (eventId, faceTokens) => {
 };
 
 // ─── SEARCH ───────────────────────────────────────────────
-export const searchFace = async (eventId, selfieFile, threshold = 75) => {
+export const searchFace = async (eventId, selfieFile, allPhotos = [], threshold = 75) => {
   // Step 1: detect face in selfie
   const selfieTokens = await detectFacesFromFile(selfieFile);
   if (!selfieTokens.length) throw new Error("No face detected in selfie. Please use a clear front-facing photo.");
 
-  // Step 2: search against event FaceSet
-  const data = await post("face-search", { faceToken: selfieTokens[0], eventId, threshold });
+  // Step 2: collect all known face tokens from existing photos
+  const allFaceTokens = [...new Set(allPhotos.flatMap((p) => p.faceTokens || []))];
+
+  // Step 3: search against event FaceSet (auto-creates if missing)
+  const data = await post("face-search", { faceToken: selfieTokens[0], eventId, threshold, allFaceTokens });
   if (data.error) throw new Error(data.error);
   return data.results || [];
 };
