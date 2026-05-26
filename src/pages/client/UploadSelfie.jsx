@@ -1,5 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { getEvent, getFacesetToken, getPhotosByFaceTokens } from "../../firebase";
+import { searchFaces } from "../../utils/facePlusPlus";
 
 export default function UploadSelfie() {
   const navigate = useNavigate();
@@ -9,6 +11,28 @@ export default function UploadSelfie() {
   const [selectedImage, setSelectedImage] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [event, setEvent] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const loadEvent = async () => {
+      try {
+        // Find event by slug
+        const { getEvents } = await import("../../firebase");
+        const events = await getEvents();
+        const foundEvent = events.find(e => e.shareSlug === slug);
+        if (foundEvent) {
+          setEvent(foundEvent);
+        } else {
+          setError("Event not found");
+        }
+      } catch (err) {
+        console.error("Error loading event:", err);
+        setError("Failed to load event");
+      }
+    };
+    loadEvent();
+  }, [slug]);
 
   const handleBack = () => {
     navigate(`/event/${slug}`);
@@ -40,16 +64,61 @@ export default function UploadSelfie() {
       return;
     }
 
+    if (!event) {
+      alert('Event not found');
+      return;
+    }
+
     setLoading(true);
-    // TODO: Implement face matching with AI
-    console.log('Finding photos for:', selectedImage);
-    
-    // Simulate processing
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    setLoading(false);
-    // Navigate to results page
-    navigate(`/event/${slug}/results`);
+    setError(null);
+
+    try {
+      console.log('🔍 Starting face search for event:', event.id);
+      
+      // 1. Get faceset token for this event
+      const facesetToken = await getFacesetToken(event.id);
+      console.log('📦 Faceset token:', facesetToken);
+      
+      if (!facesetToken) {
+        alert('No photos have been uploaded for this event yet');
+        setLoading(false);
+        return;
+      }
+
+      // 2. Search for matching faces using Face++ API
+      console.log('🔎 Searching for faces...');
+      const matches = await searchFaces(selectedImage, facesetToken, 70); // Lower threshold to 70
+      console.log('✅ Found matches:', matches);
+      
+      if (!matches || matches.length === 0) {
+        console.log('⚠️ No face matches found');
+        navigate(`/event/${slug}/results`, { 
+          state: { 
+            matchedPhotos: [],
+            eventName: event.name 
+          } 
+        });
+        return;
+      }
+      
+      // 3. Get photos that contain matching face tokens
+      console.log('📸 Getting photos for matches...');
+      const matchedPhotos = await getPhotosByFaceTokens(event.id, matches);
+      console.log('🎯 Matched photos:', matchedPhotos.length);
+      
+      // 4. Navigate to results with matched photos
+      navigate(`/event/${slug}/results`, { 
+        state: { 
+          matchedPhotos,
+          eventName: event.name 
+        } 
+      });
+      
+    } catch (err) {
+      console.error('❌ Face matching error:', err);
+      setError(err.message || 'Failed to find photos. Please try again.');
+      setLoading(false);
+    }
   };
 
   return (
@@ -218,6 +287,17 @@ export default function UploadSelfie() {
         </button>
 
         {/* Info Text */}
+        {error && (
+          <p style={{ 
+            color: "#ff6b6b", 
+            fontSize: "0.875rem", 
+            marginTop: "1rem",
+            textAlign: "center"
+          }}>
+            {error}
+          </p>
+        )}
+        
         <p style={{ 
           color: "#9A9A9A", 
           fontSize: "0.75rem", 
