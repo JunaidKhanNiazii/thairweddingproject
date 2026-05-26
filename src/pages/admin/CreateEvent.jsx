@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import Navbar from "../../components/Navbar";
 import { createEvent, uploadFile, updateEvent } from "../../firebase";
-import { createFaceSet } from "../../utils/faceApi";
 import "../../styles/components.css";
 import "./CreateEvent.css";
 
@@ -70,7 +69,7 @@ function CreateEvent() {
       // Face descriptors will be stored directly in Firestore
       console.log('✅ Event created, ready for photo uploads');
 
-      navigate(`/admin/event/${eventId}`);
+      navigate(`/admin/events/${eventId}`);
     } catch (err) {
       setError(err.message || "Failed to create event");
     } finally {

@@ -80,6 +80,14 @@ export default function UploadSelfie() {
       console.log('📸 Total photos:', allPhotos.length);
       console.log('📸 Sample photo data:', allPhotos[0]);
       
+      // Check if photos are in old format (Face++ with URLs)
+      const hasOldFormatPhotos = allPhotos.some(p => p.url && !p.imageData);
+      if (hasOldFormatPhotos) {
+        setError('These photos were uploaded with an older system. Please delete them and re-upload to use face matching.');
+        setLoading(false);
+        return;
+      }
+      
       // Filter photos that have face descriptors and reconstruct the descriptors array
       const photosWithFaces = allPhotos
         .filter(p => p.faceCount > 0)
@@ -91,12 +99,18 @@ export default function UploadSelfie() {
             if (photo[descriptorKey]) {
               // Firestore might return objects instead of arrays, convert to array
               const descriptor = photo[descriptorKey];
+              console.log(`  ${descriptorKey} type:`, typeof descriptor, 'isArray:', Array.isArray(descriptor), 'keys:', Object.keys(descriptor).length);
+              
               if (Array.isArray(descriptor)) {
                 descriptors.push(descriptor);
-              } else if (typeof descriptor === 'object') {
+              } else if (typeof descriptor === 'object' && descriptor !== null) {
                 // Convert object to array (Firestore sometimes does this)
-                descriptors.push(Object.values(descriptor));
+                const arr = Object.values(descriptor);
+                console.log(`  Converted object to array, length:`, arr.length);
+                descriptors.push(arr);
               }
+            } else {
+              console.log(`  ${descriptorKey} NOT FOUND in photo`);
             }
           }
           console.log(`Photo ${photo.id}: faceCount=${photo.faceCount}, descriptors found=${descriptors.length}`);
