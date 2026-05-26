@@ -137,12 +137,27 @@ exports.searchFaces = functions.https.onCall(async (data, context) => {
   try {
     console.log(`Searching faces for event: ${eventId}`);
 
+    // Get event to verify faceset exists
+    const eventDoc = await admin.firestore()
+      .collection("events").doc(eventId).get();
+    
+    if (!eventDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "Event not found");
+    }
+
+    const facesetToken = eventDoc.data().facesetToken;
+    
+    if (!facesetToken) {
+      console.log("No faceset token found for event");
+      return { photos: [] };
+    }
+
     // Call Face++ Search API
     const formData = new FormData();
     formData.append("api_key", FACEPP_API_KEY);
     formData.append("api_secret", FACEPP_API_SECRET);
     formData.append("image_base64", selfieBase64.split(",")[1]); // Remove data:image/jpeg;base64, prefix
-    formData.append("faceset_token", `event_${eventId}`);
+    formData.append("faceset_token", facesetToken);
     formData.append("return_result_count", "50");
 
     const searchResponse = await fetch(FACEPP_SEARCH_URL, {

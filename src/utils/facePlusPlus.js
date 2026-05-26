@@ -126,37 +126,25 @@ export const searchFaces = async (selfieFile, facesetToken, threshold = 75) => {
   try {
     const base64Image = await fileToBase64(selfieFile);
     
-    const formData = new FormData();
-    formData.append('api_key', API_KEY);
-    formData.append('api_secret', API_SECRET);
-    formData.append('image_base64', base64Image);
-    formData.append('faceset_token', facesetToken);
-    
-    const response = await fetch(`${BASE_URL}/search`, {
+    // Use Vercel serverless function to avoid CORS
+    const response = await fetch('/api/searchFaces', {
       method: 'POST',
-      body: formData
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        selfieBase64: base64Image,
+        facesetToken: facesetToken
+      })
     });
     
     const data = await response.json();
     
-    if (data.error_message) {
-      throw new Error(data.error_message);
+    if (data.error) {
+      throw new Error(data.error);
     }
     
-    // Filter results by confidence threshold
-    const matches = [];
-    if (data.results && data.results.length > 0) {
-      data.results.forEach(result => {
-        if (result.confidence >= threshold) {
-          matches.push({
-            face_token: result.face_token,
-            confidence: result.confidence
-          });
-        }
-      });
-    }
-    
-    return matches;
+    return data.matches || [];
   } catch (error) {
     console.error('Face search error:', error);
     throw error;
