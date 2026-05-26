@@ -1,6 +1,4 @@
-// Proxy: detect faces in an image file (base64) via Face++
-import { FormData, Blob } from "formdata-node";
-
+// Proxy: detect faces in an image (base64) via Face++
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
 
@@ -9,20 +7,42 @@ export default async function handler(req, res) {
   const API_SECRET = process.env.VITE_FACEPP_API_SECRET;
 
   try {
-    // Convert base64 to blob
+    // Strip data URL prefix and convert to buffer
     const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
 
-    const form = new FormData();
-    form.set("api_key", API_KEY);
-    form.set("api_secret", API_SECRET);
-    form.set("image_file", new Blob([buffer], { type: "image/jpeg" }), "image.jpg");
-    form.set("return_attributes", "none");
+    // Build multipart form manually
+    const boundary = "----FormBoundary" + Math.random().toString(36).substring(2);
+
+    const textPart = (name, value) =>
+      `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`;
+
+    const filePart = (name, filename, data) =>
+      Buffer.concat([
+        Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${name}"; filename="${filename}"\r\nContent-Type: image/jpeg\r\n\r\n`),
+        data,
+        Buffer.from("\r\n"),
+      ]);
+
+    const endPart = Buffer.from(`--${boundary}--\r\n`);
+
+    const body = Buffer.concat([
+      Buffer.from(textPart("api_key", API_KEY)),
+      Buffer.from(textPart("api_secret", API_SECRET)),
+      Buffer.from(textPart("return_attributes", "none")),
+      filePart("image_file", "image.jpg", buffer),
+      endPart,
+    ]);
 
     const response = await fetch("https://api-us.faceplusplus.com/facepp/v3/detect", {
       method: "POST",
-      body: form,
+      headers: {
+        "Content-Type": `multipart/form-data; boundary=${boundary}`,
+        "Content-Length": body.length,
+      },
+      body,
     });
+
     const data = await response.json();
     return res.status(200).json(data);
   } catch (err) {
