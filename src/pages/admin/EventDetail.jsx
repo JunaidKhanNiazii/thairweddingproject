@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import Navbar from "../../components/Navbar";
-import { getEvent, getPhotos, savePhoto, deletePhoto, updateEvent } from "../../firebase";
-import { detectFacesFromFile, addFacesToSet } from "../../utils/faceApi";
+import { getEvent, getPhotos, savePhoto, deletePhoto, updateEvent, getFacesetToken, saveFacesetToken } from "../../firebase";
+import { detectFaces, createFaceset, addFacesToFaceset, getFaceset } from "../../utils/facePlusPlus";
 import "../../styles/components.css";
 import "./EventDetail.css";
 
@@ -82,20 +82,38 @@ function EventDetail() {
       setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, status: "reading", progress: 30 } : u));
       const base64 = await fileToBase64(file);
 
-      // 2. Detect faces directly from file
-      setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, status: "detecting", progress: 60 } : u));
+      // 2. Detect faces using Face++ API
+      setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, status: "detecting", progress: 50 } : u));
 
       let faceTokens = [];
       try {
-        faceTokens = await detectFacesFromFile(file);
+        faceTokens = await detectFaces(file);
+        
+        // 3. Get or create faceset for this event
         if (faceTokens.length > 0) {
-          await addFacesToSet(eventId, faceTokens);
+          setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, status: "adding faces", progress: 70 } : u));
+          
+          let facesetToken = await getFacesetToken(eventId);
+          
+          // Create faceset if it doesn't exist
+          if (!facesetToken) {
+            const facesetData = await getFaceset(eventId);
+            if (facesetData) {
+              facesetToken = facesetData.faceset_token;
+            } else {
+              facesetToken = await createFaceset(eventId);
+            }
+            await saveFacesetToken(eventId, facesetToken);
+          }
+          
+          // Add faces to faceset
+          await addFacesToFaceset(facesetToken, faceTokens);
         }
       } catch (faceErr) {
         console.warn("Face detection failed:", faceErr.message);
       }
 
-      // 3. Save to Firestore (base64 image + face tokens)
+      // 4. Save to Firestore (base64 image + face tokens)
       setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, status: "saving", progress: 85 } : u));
 
       const photoRef = await savePhoto(eventId, {
@@ -105,10 +123,10 @@ function EventDetail() {
         faceCount: faceTokens.length,
       });
 
-      // 4. Update photoCount
+      // 5. Update photoCount
       await updateEvent(eventId, { photoCount: photos.length + 1 });
 
-      // 5. Add to local state
+      // 6. Add to local state
       const newPhoto = {
         id: photoRef.id,
         fileName: file.name,

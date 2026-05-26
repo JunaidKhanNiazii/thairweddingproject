@@ -1,6 +1,9 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, getDocs, getDoc, doc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { getAnalytics } from "firebase/analytics";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -9,11 +12,15 @@ const firebaseConfig = {
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
+export const storage = getStorage(app);
+export const functions = getFunctions(app);
+export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 
 // ─── EVENTS ───────────────────────────────────────────────
 
@@ -60,3 +67,47 @@ export const getPhotos = async (eventId) => {
 
 export const deletePhoto = (eventId, photoId) =>
   deleteDoc(doc(db, "events", eventId, "photos", photoId));
+
+
+// ─── FACESET MANAGEMENT ───────────────────────────────────
+
+/**
+ * Save faceset token for an event
+ */
+export const saveFacesetToken = async (eventId, facesetToken) => {
+  await updateEvent(eventId, { facesetToken });
+};
+
+/**
+ * Get faceset token for an event
+ */
+export const getFacesetToken = async (eventId) => {
+  const event = await getEvent(eventId);
+  return event?.facesetToken || null;
+};
+
+/**
+ * Map face tokens to photo IDs
+ * Stores which face tokens belong to which photos
+ */
+export const saveFaceTokenMapping = async (eventId, photoId, faceTokens) => {
+  const mappingRef = doc(db, "events", eventId, "faceTokenMappings", photoId);
+  await updateDoc(mappingRef, { faceTokens });
+};
+
+/**
+ * Get photos that contain matching face tokens
+ */
+export const getPhotosByFaceTokens = async (eventId, matchingFaceTokens) => {
+  const photos = await getPhotos(eventId);
+  
+  // Filter photos that have any of the matching face tokens
+  const matchedPhotos = photos.filter(photo => {
+    if (!photo.faceTokens || photo.faceTokens.length === 0) return false;
+    return photo.faceTokens.some(token => 
+      matchingFaceTokens.some(match => match.face_token === token)
+    );
+  });
+  
+  return matchedPhotos;
+};

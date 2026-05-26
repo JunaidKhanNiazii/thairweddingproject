@@ -1,49 +1,64 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 
 export default function Results() {
   const navigate = useNavigate();
   const { slug } = useParams();
-  const [eventName, setEventName] = useState("Riya & Arjun");
+  const location = useLocation();
+  const [eventName, setEventName] = useState("");
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // TODO: Fetch matched photos from Firebase
-    // Simulate loading
-    setTimeout(() => {
-      // Mock data for testing
-      setPhotos([
-        { id: 1, url: "/placeholder1.jpg", thumbnail: "/placeholder1.jpg" },
-        { id: 2, url: "/placeholder2.jpg", thumbnail: "/placeholder2.jpg" },
-        { id: 3, url: "/placeholder3.jpg", thumbnail: "/placeholder3.jpg" },
-        { id: 4, url: "/placeholder4.jpg", thumbnail: "/placeholder4.jpg" },
-        { id: 5, url: "/placeholder5.jpg", thumbnail: "/placeholder5.jpg" },
-        { id: 6, url: "/placeholder6.jpg", thumbnail: "/placeholder6.jpg" },
-      ]);
+    // If coming from upload flow with state, use that data
+    if (location.state?.matchedPhotos) {
+      const matchedPhotos = location.state.matchedPhotos;
+      const name = location.state.eventName || "Event";
+      
+      setEventName(name);
+      setPhotos(matchedPhotos);
       setLoading(false);
-    }, 1000);
-  }, [slug]);
+    } else {
+      // If accessing directly via link, redirect to upload page
+      navigate(`/event/${slug}/upload`, { replace: true });
+    }
+  }, [location, navigate, slug]);
 
   const handleBack = () => {
     navigate(`/event/${slug}`);
   };
 
-  const handleDownloadAll = () => {
-    // TODO: Implement download all as zip
-    alert("Download all coming soon!");
+  const handleDownloadAll = async () => {
+    if (photos.length === 0) return;
+    
+    // Download each photo
+    for (let i = 0; i < photos.length; i++) {
+      const photo = photos[i];
+      const link = document.createElement('a');
+      link.href = photo.imageData;
+      link.download = photo.fileName || `photo_${i + 1}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Small delay between downloads
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
   };
 
-  const handleDownloadPhoto = (photoId) => {
-    // TODO: Implement single photo download
-    console.log("Download photo:", photoId);
-    alert("Download coming soon!");
+  const handleDownloadPhoto = (photo) => {
+    const link = document.createElement('a');
+    link.href = photo.imageData;
+    link.download = photo.fileName || `photo_${photo.id}.jpg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
-  const handlePhotoClick = (photoId) => {
-    // TODO: Open lightbox
-    console.log("Open lightbox for:", photoId);
-    alert("Lightbox coming soon!");
+  const handlePhotoClick = (photo) => {
+    // Open photo in new tab
+    const win = window.open();
+    win.document.write(`<img src="${photo.imageData}" style="max-width:100%; height:auto;" />`);
   };
 
   if (loading) {
@@ -157,27 +172,24 @@ export default function Results() {
                     background: "#1A1A1A",
                     border: "1px solid rgba(201, 169, 97, 0.15)"
                   }}
-                  onClick={() => handlePhotoClick(photo.id)}
+                  onClick={() => handlePhotoClick(photo)}
                 >
-                  {/* Placeholder for image */}
-                  <div style={{ 
-                    width: "100%", 
-                    height: "100%", 
-                    background: "#2A2A2A",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "#9A9A9A",
-                    fontSize: "0.75rem"
-                  }}>
-                    Photo {photo.id}
-                  </div>
+                  {/* Photo Image */}
+                  <img 
+                    src={photo.imageData} 
+                    alt={photo.fileName}
+                    style={{ 
+                      width: "100%", 
+                      height: "100%", 
+                      objectFit: "cover"
+                    }}
+                  />
 
                   {/* Download button overlay */}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleDownloadPhoto(photo.id);
+                      handleDownloadPhoto(photo);
                     }}
                     style={{
                       position: "absolute",
