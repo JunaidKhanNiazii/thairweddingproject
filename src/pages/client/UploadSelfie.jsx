@@ -73,6 +73,7 @@ export default function UploadSelfie() {
 
     try {
       console.log('🔍 Starting face search for event:', event.id);
+      console.log('📱 Using Cloud Function for face matching');
       
       // Convert image to base64
       const reader = new FileReader();
