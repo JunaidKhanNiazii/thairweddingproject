@@ -146,8 +146,8 @@ export default function UploadSelfie() {
       
       // 3. Find matches using face-api.js
       console.log('🔎 Searching for matches...');
-      console.log('🔎 Threshold:', 0.6);
-      const matches = await findMatches(selectedImage, photoDescriptors, 0.6);
+      console.log('🔎 Threshold:', 0.5);
+      const matches = await findMatches(selectedImage, photoDescriptors, 0.5);
       console.log('✅ Found matches:', matches.length);
       console.log('✅ Match details:', matches);
       
