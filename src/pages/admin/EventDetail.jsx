@@ -2,12 +2,21 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import Navbar from "../../components/Navbar";
-import { getEvent, getPhotos, savePhoto, deletePhoto, uploadFile, deleteFile, updateEvent } from "../../firebase";
-import { detectFaces, addFacesToSet } from "../../utils/faceApi";
+import { getEvent, getPhotos, savePhoto, deletePhoto, updateEvent } from "../../firebase";
+import { detectFaces } from "../../utils/faceApi";
 import "../../styles/components.css";
 import "./EventDetail.css";
 
 const APP_URL = import.meta.env.VITE_APP_URL || window.location.origin;
+
+// Convert File to base64
+const fileToBase64 = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 
 function EventDetail() {
   const navigate = useNavigate();
@@ -62,52 +71,70 @@ function EventDetail() {
 
   const uploadPhoto = async (file) => {
     const tempId = Date.now() + Math.random();
-    setUploading((prev) => [...prev, { id: tempId, name: file.name, progress: 0, status: "uploading" }]);
+
+    setUploading((prev) => [...prev, { id: tempId, name: file.name, progress: 0, status: "reading" }]);
 
     try {
-      // 1. Upload to Firebase Storage
-      const storagePath = `events/${eventId}/original/${tempId}_${file.name}`;
-      const downloadUrl = await uploadFile(storagePath, file, (pct) => {
-        setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, progress: pct } : u));
-      });
+      // 1. Convert to base64 for storage + preview
+      setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, status: "reading", progress: 30 } : u));
+      const base64 = await fileToBase64(file);
 
-      // 2. Detect faces via Face++ using the Storage URL
-      setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, status: "detecting", progress: 100 } : u));
+      // 2. Detect faces using face-api.js
+      setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, status: "detecting", progress: 50 } : u));
 
       let faceDescriptors = [];
       try {
-        faceTokens = await detectFaces(downloadUrl);
-        if (faceTokens.length > 0) {
-          await addFacesToSet(eventId, faceTokens);
-        }
+        const detections = await detectFaces(file);
+        // Convert Float32Array descriptors to regular arrays for Firestore
+        // Each descriptor is a 128-dimensional vector that needs to be stored as a flat array
+        faceDescriptors = detections.map(d => {
+          const descriptor = Array.from(d.descriptor);
+          console.log('Descriptor type:', typeof descriptor, 'Length:', descriptor.length);
+          return descriptor;
+        });
+        console.log(`✅ Detected ${faceDescriptors.length} face(s)`);
       } catch (faceErr) {
         console.warn("Face detection failed:", faceErr.message);
       }
 
-      // 3. Save metadata to Firestore (URL + face tokens)
-      setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, status: "saving" } : u));
-      const photoRef = await savePhoto(eventId, {
-        storagePath,
-        url: downloadUrl,
+      // 3. Save to Firestore (base64 image + face descriptors)
+      setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, status: "saving", progress: 85 } : u));
+
+      // Store each face descriptor as a separate field to avoid nested arrays
+      const photoData = {
         fileName: file.name,
-        faceTokens,
-        faceCount: faceTokens.length,
+        imageData: base64,
+        faceCount: faceDescriptors.length,
+      };
+      
+      // Add each descriptor as a separate field (descriptor_0, descriptor_1, etc.)
+      faceDescriptors.forEach((desc, index) => {
+        photoData[`descriptor_${index}`] = desc;
       });
 
-      // 4. Update photo count
-      await updateEvent(eventId, { photoCount: photos.length + 1 });
+      const photoRef = await savePhoto(eventId, photoData);
 
-      // 5. Add to local state
-      setPhotos((prev) => [...prev, {
+      // 4. Add to local state first
+      const newPhoto = {
         id: photoRef.id,
-        storagePath,
-        url: downloadUrl,
         fileName: file.name,
-        faceTokens,
-        faceCount: faceTokens.length,
-      }]);
+        imageData: base64,
+        faceCount: faceDescriptors.length,
+      };
+      
+      // Add descriptors to local state
+      faceDescriptors.forEach((desc, index) => {
+        newPhoto[`descriptor_${index}`] = desc;
+      });
+      
+      setPhotos((prev) => {
+        const updatedPhotos = [...prev, newPhoto];
+        // Update photoCount in Firestore with correct count
+        updateEvent(eventId, { photoCount: updatedPhotos.length });
+        return updatedPhotos;
+      });
 
-      setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, status: "done", faceCount: faceTokens.length } : u));
+      setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, status: "done", progress: 100, faceCount: faceDescriptors.length } : u));
       setTimeout(() => setUploading((prev) => prev.filter((u) => u.id !== tempId)), 3000);
 
     } catch (err) {
@@ -117,10 +144,13 @@ function EventDetail() {
 
   const handleDeletePhoto = async (photo) => {
     try {
-      if (photo.storagePath) await deleteFile(photo.storagePath);
       await deletePhoto(eventId, photo.id);
-      setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
-      await updateEvent(eventId, { photoCount: Math.max(0, photos.length - 1) });
+      setPhotos((prev) => {
+        const updatedPhotos = prev.filter((p) => p.id !== photo.id);
+        // Update photoCount in Firestore with correct count
+        updateEvent(eventId, { photoCount: updatedPhotos.length });
+        return updatedPhotos;
+      });
     } catch (err) {
       console.error("Delete failed:", err);
     }
@@ -214,7 +244,7 @@ function EventDetail() {
               {photos.map((photo) => (
                 <div key={photo.id} className="photo-thumbnail">
                   <div className="photo-thumbnail-inner">
-                    <img src={photo.url} alt={photo.fileName} className="photo-image" loading="lazy" />
+                    <img src={photo.imageData} alt={photo.fileName} className="photo-image" loading="lazy" />
                     <button onClick={() => handleDeletePhoto(photo)} className="photo-delete" aria-label="Delete photo">✕</button>
                     {photo.faceCount > 0 && <span className="photo-face-badge">{photo.faceCount} 👤</span>}
                   </div>
