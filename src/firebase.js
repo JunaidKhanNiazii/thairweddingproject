@@ -1,9 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, getDocs, getDoc, doc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import { getAnalytics } from "firebase/analytics";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { getFunctions, httpsCallable } from "firebase/functions";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -12,15 +10,12 @@ const firebaseConfig = {
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
-export const functions = getFunctions(app);
-export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 
 // ─── EVENTS ───────────────────────────────────────────────
 
@@ -52,8 +47,6 @@ export const deleteEvent = (eventId) =>
 
 // ─── PHOTOS ───────────────────────────────────────────────
 
-// Save photo metadata + face tokens to Firestore
-// imageDataUrl: base64 data URL of the image (stored in Firestore until Storage is added)
 export const savePhoto = (eventId, data) =>
   addDoc(collection(db, "events", eventId, "photos"), {
     ...data,
@@ -68,46 +61,29 @@ export const getPhotos = async (eventId) => {
 export const deletePhoto = (eventId, photoId) =>
   deleteDoc(doc(db, "events", eventId, "photos", photoId));
 
+// ─── STORAGE ──────────────────────────────────────────────
 
-// ─── FACESET MANAGEMENT ───────────────────────────────────
-
-/**
- * Save faceset token for an event
- */
-export const saveFacesetToken = async (eventId, facesetToken) => {
-  await updateEvent(eventId, { facesetToken });
-};
-
-/**
- * Get faceset token for an event
- */
-export const getFacesetToken = async (eventId) => {
-  const event = await getEvent(eventId);
-  return event?.facesetToken || null;
-};
-
-/**
- * Map face tokens to photo IDs
- * Stores which face tokens belong to which photos
- */
-export const saveFaceTokenMapping = async (eventId, photoId, faceTokens) => {
-  const mappingRef = doc(db, "events", eventId, "faceTokenMappings", photoId);
-  await updateDoc(mappingRef, { faceTokens });
-};
-
-/**
- * Get photos that contain matching face tokens
- */
-export const getPhotosByFaceTokens = async (eventId, matchingFaceTokens) => {
-  const photos = await getPhotos(eventId);
-  
-  // Filter photos that have any of the matching face tokens
-  const matchedPhotos = photos.filter(photo => {
-    if (!photo.faceTokens || photo.faceTokens.length === 0) return false;
-    return photo.faceTokens.some(token => 
-      matchingFaceTokens.some(match => match.face_token === token)
+// Upload file to Firebase Storage with progress callback
+// Returns the public download URL
+export const uploadFile = (storagePath, file, onProgress) => {
+  return new Promise((resolve, reject) => {
+    const storageRef = ref(storage, storagePath);
+    const task = uploadBytesResumable(storageRef, file);
+    task.on(
+      "state_changed",
+      (snap) => {
+        const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+        if (onProgress) onProgress(pct);
+      },
+      reject,
+      async () => {
+        const url = await getDownloadURL(task.snapshot.ref);
+        resolve(url);
+      }
     );
   });
-  
-  return matchedPhotos;
 };
+
+// Delete file from Storage
+export const deleteFile = (storagePath) =>
+  deleteObject(ref(storage, storagePath));
