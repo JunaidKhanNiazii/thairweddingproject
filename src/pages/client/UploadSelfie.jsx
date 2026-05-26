@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { getEvent, getFacesetToken, getPhotosByFaceTokens } from "../../firebase";
-import { searchFaces } from "../../utils/facePlusPlus";
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 export default function UploadSelfie() {
   const navigate = useNavigate();
@@ -74,23 +73,32 @@ export default function UploadSelfie() {
 
     try {
       console.log('🔍 Starting face search for event:', event.id);
+      console.log('📱 Using Cloud Function for face matching');
       
-      // 1. Get faceset token for this event
-      const facesetToken = await getFacesetToken(event.id);
-      console.log('📦 Faceset token:', facesetToken);
+      // Convert image to base64
+      const reader = new FileReader();
+      reader.readAsDataURL(selectedImage);
       
-      if (!facesetToken) {
-        alert('No photos have been uploaded for this event yet');
-        setLoading(false);
-        return;
-      }
-
-      // 2. Search for matching faces using Face++ API
-      console.log('🔎 Searching for faces...');
-      const matches = await searchFaces(selectedImage, facesetToken, 70); // Lower threshold to 70
-      console.log('✅ Found matches:', matches);
+      await new Promise((resolve) => {
+        reader.onloadend = resolve;
+      });
       
-      if (!matches || matches.length === 0) {
+      const selfieBase64 = reader.result;
+      
+      // Call Cloud Function to search faces
+      const functions = getFunctions();
+      const searchFaces = httpsCallable(functions, 'searchFaces');
+      
+      console.log('🔎 Calling searchFaces Cloud Function...');
+      const result = await searchFaces({
+        eventId: event.id,
+        selfieBase64: selfieBase64
+      });
+      
+      const matchedPhotos = result.data.photos || [];
+      console.log('✅ Found matches:', matchedPhotos.length);
+      
+      if (matchedPhotos.length === 0) {
         console.log('⚠️ No face matches found');
         navigate(`/event/${slug}/results`, { 
           state: { 
@@ -101,15 +109,15 @@ export default function UploadSelfie() {
         return;
       }
       
-      // 3. Get photos that contain matching face tokens
-      console.log('📸 Getting photos for matches...');
-      const matchedPhotos = await getPhotosByFaceTokens(event.id, matches);
-      console.log('🎯 Matched photos:', matchedPhotos.length);
-      
-      // 4. Navigate to results with matched photos
+      // Navigate to results with matched photos
       navigate(`/event/${slug}/results`, { 
         state: { 
-          matchedPhotos,
+          matchedPhotos: matchedPhotos.map(photo => ({
+            id: photo.id,
+            imageData: photo.url, // Use the signed URL from Cloud Function
+            fileName: `photo_${photo.id}.jpg`,
+            faceCount: photo.faceCount
+          })),
           eventName: event.name 
         } 
       });
