@@ -121,12 +121,17 @@ export const findMatches = async (selfieFile, photoDescriptors, threshold = 0.6)
     
     // Compare selfie with all photo descriptors
     for (const photo of photoDescriptors) {
+      console.log(`Checking photo ${photo.photoId} with ${photo.descriptors.length} face(s)`);
+      
       for (const photoDescriptor of photo.descriptors) {
         const distance = compareFaces(selfieDescriptor, photoDescriptor);
+        console.log(`  Distance: ${distance.toFixed(4)} (threshold: ${threshold})`);
         
         if (distance < threshold) {
           // Convert distance to confidence percentage (0.6 = 0%, 0 = 100%)
           const confidence = Math.max(0, Math.min(100, (1 - distance / 0.6) * 100));
+          
+          console.log(`  ✅ MATCH! Confidence: ${confidence.toFixed(2)}%`);
           
           matches.push({
             photoId: photo.photoId,

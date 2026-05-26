@@ -78,6 +78,7 @@ export default function UploadSelfie() {
       // 1. Get all photos with face descriptors for this event
       const allPhotos = await getPhotos(event.id);
       console.log('📸 Total photos:', allPhotos.length);
+      console.log('📸 Sample photo data:', allPhotos[0]);
       
       // Filter photos that have face descriptors and reconstruct the descriptors array
       const photosWithFaces = allPhotos
@@ -88,9 +89,17 @@ export default function UploadSelfie() {
           for (let i = 0; i < photo.faceCount; i++) {
             const descriptorKey = `descriptor_${i}`;
             if (photo[descriptorKey]) {
-              descriptors.push(photo[descriptorKey]);
+              // Firestore might return objects instead of arrays, convert to array
+              const descriptor = photo[descriptorKey];
+              if (Array.isArray(descriptor)) {
+                descriptors.push(descriptor);
+              } else if (typeof descriptor === 'object') {
+                // Convert object to array (Firestore sometimes does this)
+                descriptors.push(Object.values(descriptor));
+              }
             }
           }
+          console.log(`Photo ${photo.id}: faceCount=${photo.faceCount}, descriptors found=${descriptors.length}`);
           return {
             ...photo,
             faceDescriptors: descriptors
@@ -99,6 +108,7 @@ export default function UploadSelfie() {
         .filter(p => p.faceDescriptors.length > 0);
       
       console.log('👤 Photos with faces:', photosWithFaces.length);
+      console.log('👤 Sample photo with faces:', photosWithFaces[0]);
       
       if (photosWithFaces.length === 0) {
         alert('No photos with faces found for this event');
@@ -109,15 +119,23 @@ export default function UploadSelfie() {
       // 2. Prepare photo descriptors for matching
       const photoDescriptors = photosWithFaces.map(photo => ({
         photoId: photo.id,
-        descriptors: photo.faceDescriptors.map(d => new Float32Array(d)),
+        descriptors: photo.faceDescriptors.map(d => {
+          console.log('Descriptor type:', typeof d, 'Is array:', Array.isArray(d), 'Length:', d?.length);
+          return new Float32Array(d);
+        }),
         imageData: photo.imageData,
         fileName: photo.fileName
       }));
       
+      console.log('📊 Prepared descriptors:', photoDescriptors.length);
+      console.log('📊 First descriptor sample:', photoDescriptors[0]?.descriptors[0]);
+      
       // 3. Find matches using face-api.js
       console.log('🔎 Searching for matches...');
+      console.log('🔎 Threshold:', 0.6);
       const matches = await findMatches(selectedImage, photoDescriptors, 0.6);
       console.log('✅ Found matches:', matches.length);
+      console.log('✅ Match details:', matches);
       
       // 4. Get matched photos
       const matchedPhotos = matches.map(match => {
