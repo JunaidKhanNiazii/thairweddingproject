@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import Navbar from "../../components/Navbar";
-import { getEvent, getPhotos, savePhoto, deletePhoto, updateEvent, getFacesetToken, saveFacesetToken } from "../../firebase";
-import { detectFaces, createFaceset, addFacesToFaceset, getFaceset } from "../../utils/facePlusPlus";
+import { getEvent, getPhotos, savePhoto, deletePhoto, updateEvent } from "../../firebase";
+import { detectFaces } from "../../utils/faceApi";
 import "../../styles/components.css";
 import "./EventDetail.css";
 
@@ -82,61 +82,60 @@ function EventDetail() {
       setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, status: "reading", progress: 30 } : u));
       const base64 = await fileToBase64(file);
 
-      // 2. Detect faces using Face++ API
+      // 2. Detect faces using face-api.js
       setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, status: "detecting", progress: 50 } : u));
 
-      let faceTokens = [];
+      let faceDescriptors = [];
       try {
-        faceTokens = await detectFaces(file);
-        
-        // 3. Get or create faceset for this event
-        if (faceTokens.length > 0) {
-          setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, status: "adding faces", progress: 70 } : u));
-          
-          let facesetToken = await getFacesetToken(eventId);
-          
-          // Create faceset if it doesn't exist
-          if (!facesetToken) {
-            const facesetData = await getFaceset(eventId);
-            if (facesetData) {
-              facesetToken = facesetData.faceset_token;
-            } else {
-              facesetToken = await createFaceset(eventId);
-            }
-            await saveFacesetToken(eventId, facesetToken);
-          }
-          
-          // Add faces to faceset
-          await addFacesToFaceset(facesetToken, faceTokens);
-        }
+        const detections = await detectFaces(file);
+        // Convert Float32Array descriptors to regular arrays for Firestore
+        // Each descriptor is a 128-dimensional vector that needs to be stored as a flat array
+        faceDescriptors = detections.map(d => {
+          const descriptor = Array.from(d.descriptor);
+          console.log('Descriptor type:', typeof descriptor, 'Length:', descriptor.length);
+          return descriptor;
+        });
+        console.log(`✅ Detected ${faceDescriptors.length} face(s)`);
       } catch (faceErr) {
         console.warn("Face detection failed:", faceErr.message);
       }
 
-      // 4. Save to Firestore (base64 image + face tokens)
+      // 3. Save to Firestore (base64 image + face descriptors)
       setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, status: "saving", progress: 85 } : u));
 
-      const photoRef = await savePhoto(eventId, {
+      // Store each face descriptor as a separate field to avoid nested arrays
+      const photoData = {
         fileName: file.name,
-        imageData: base64,       // base64 stored in Firestore
-        faceTokens,
-        faceCount: faceTokens.length,
+        imageData: base64,
+        faceCount: faceDescriptors.length,
+      };
+      
+      // Add each descriptor as a separate field (descriptor_0, descriptor_1, etc.)
+      faceDescriptors.forEach((desc, index) => {
+        photoData[`descriptor_${index}`] = desc;
       });
 
-      // 5. Update photoCount
+      const photoRef = await savePhoto(eventId, photoData);
+
+      // 4. Update photoCount
       await updateEvent(eventId, { photoCount: photos.length + 1 });
 
-      // 6. Add to local state
+      // 5. Add to local state
       const newPhoto = {
         id: photoRef.id,
         fileName: file.name,
         imageData: base64,
-        faceTokens,
-        faceCount: faceTokens.length,
+        faceCount: faceDescriptors.length,
       };
+      
+      // Add descriptors to local state
+      faceDescriptors.forEach((desc, index) => {
+        newPhoto[`descriptor_${index}`] = desc;
+      });
+      
       setPhotos((prev) => [...prev, newPhoto]);
 
-      setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, status: "done", progress: 100, faceCount: faceTokens.length } : u));
+      setUploading((prev) => prev.map((u) => u.id === tempId ? { ...u, status: "done", progress: 100, faceCount: faceDescriptors.length } : u));
       setTimeout(() => setUploading((prev) => prev.filter((u) => u.id !== tempId)), 3000);
 
     } catch (err) {

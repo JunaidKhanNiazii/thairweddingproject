@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
+import JSZip from "jszip";
 
 export default function Results() {
   const navigate = useNavigate();
@@ -31,18 +32,38 @@ export default function Results() {
   const handleDownloadAll = async () => {
     if (photos.length === 0) return;
     
-    // Download each photo
-    for (let i = 0; i < photos.length; i++) {
-      const photo = photos[i];
+    try {
+      // Create a new JSZip instance
+      const zip = new JSZip();
+      
+      // Add each photo to the zip
+      for (let i = 0; i < photos.length; i++) {
+        const photo = photos[i];
+        
+        // Convert base64 to blob
+        const base64Data = photo.imageData.split(',')[1];
+        const fileName = photo.fileName || `photo_${i + 1}.jpg`;
+        
+        // Add file to zip
+        zip.file(fileName, base64Data, { base64: true });
+      }
+      
+      // Generate zip file
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      
+      // Create download link
       const link = document.createElement('a');
-      link.href = photo.imageData;
-      link.download = photo.fileName || `photo_${i + 1}.jpg`;
+      link.href = URL.createObjectURL(zipBlob);
+      link.download = `${eventName.replace(/\s+/g, '_')}_photos.zip`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       
-      // Small delay between downloads
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Clean up
+      URL.revokeObjectURL(link.href);
+    } catch (error) {
+      console.error('Error creating zip:', error);
+      alert('Failed to download photos. Please try downloading individually.');
     }
   };
 
@@ -58,7 +79,11 @@ export default function Results() {
   const handlePhotoClick = (photo) => {
     // Open photo in new tab
     const win = window.open();
-    win.document.write(`<img src="${photo.imageData}" style="max-width:100%; height:auto;" />`);
+    if (win) {
+      win.document.body.innerHTML = `<img src="${photo.imageData}" style="max-width:100%; height:auto; display:block; margin:0 auto; background:#000;" />`;
+      win.document.body.style.margin = '0';
+      win.document.body.style.background = '#000';
+    }
   };
 
   if (loading) {
@@ -172,7 +197,7 @@ export default function Results() {
                     background: "#1A1A1A",
                     border: "1px solid rgba(201, 169, 97, 0.15)"
                   }}
-                  onClick={() => handlePhotoClick(photo)}
+                  className="photo-card"
                 >
                   {/* Photo Image */}
                   <img 
@@ -183,6 +208,7 @@ export default function Results() {
                       height: "100%", 
                       objectFit: "cover"
                     }}
+                    onClick={() => handlePhotoClick(photo)}
                   />
 
                   {/* Download button overlay */}
@@ -198,7 +224,7 @@ export default function Results() {
                       width: "32px",
                       height: "32px",
                       background: "rgba(0, 0, 0, 0.8)",
-                      border: "none",
+                      border: "1px solid rgba(201, 169, 97, 0.5)",
                       borderRadius: "50%",
                       color: "#C9A961",
                       fontSize: "1rem",
@@ -206,18 +232,20 @@ export default function Results() {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      opacity: 0,
-                      transition: "opacity 300ms ease"
+                      transition: "all 300ms ease",
+                      zIndex: 10
                     }}
+                    className="download-icon-btn"
                     onMouseEnter={(e) => {
                       e.currentTarget.style.background = "#C9A961";
                       e.currentTarget.style.color = "#0B0B0B";
+                      e.currentTarget.style.transform = "scale(1.1)";
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.background = "rgba(0, 0, 0, 0.8)";
                       e.currentTarget.style.color = "#C9A961";
+                      e.currentTarget.style.transform = "scale(1)";
                     }}
-                    className="download-btn"
                   >
                     ⤓
                   </button>
@@ -226,11 +254,16 @@ export default function Results() {
             </div>
 
             <style>{`
-              .download-btn {
+              .photo-card .download-icon-btn {
                 opacity: 0;
               }
-              div:hover .download-btn {
+              .photo-card:hover .download-icon-btn {
                 opacity: 1;
+              }
+              @media (hover: none) {
+                .photo-card .download-icon-btn {
+                  opacity: 1;
+                }
               }
             `}</style>
           </>

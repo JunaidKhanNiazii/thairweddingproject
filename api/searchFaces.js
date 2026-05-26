@@ -20,19 +20,19 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
-    // Call Face++ API
-    const FormData = require('form-data');
-    const fetch = require('node-fetch');
-
-    const formData = new FormData();
-    formData.append('api_key', process.env.VITE_FACEPP_API_KEY);
-    formData.append('api_secret', process.env.VITE_FACEPP_API_SECRET);
-    formData.append('image_base64', selfieBase64);
-    formData.append('faceset_token', facesetToken);
+    // Call Face++ API using URLSearchParams (no external dependencies needed)
+    const params = new URLSearchParams();
+    params.append('api_key', process.env.VITE_FACEPP_API_KEY);
+    params.append('api_secret', process.env.VITE_FACEPP_API_SECRET);
+    params.append('image_base64', selfieBase64);
+    params.append('faceset_token', facesetToken);
 
     const response = await fetch('https://api-us.faceplusplus.com/facepp/v3/search', {
       method: 'POST',
-      body: formData
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString()
     });
 
     const data = await response.json();

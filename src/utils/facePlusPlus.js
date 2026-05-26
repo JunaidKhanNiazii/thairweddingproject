@@ -126,25 +126,69 @@ export const searchFaces = async (selfieFile, facesetToken, threshold = 75) => {
   try {
     const base64Image = await fileToBase64(selfieFile);
     
-    // Use Vercel serverless function to avoid CORS
-    const response = await fetch('/api/searchFaces', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        selfieBase64: base64Image,
-        facesetToken: facesetToken
-      })
-    });
+    const formData = new FormData();
+    formData.append('api_key', API_KEY);
+    formData.append('api_secret', API_SECRET);
+    formData.append('image_base64', base64Image);
+    formData.append('faceset_token', facesetToken);
     
-    const data = await response.json();
+    // Use Vite proxy for localhost, Vercel serverless for production
+    const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const apiUrl = isDev ? '/facepp-api/search' : '/api/searchFaces';
     
-    if (data.error) {
-      throw new Error(data.error);
+    if (isDev) {
+      // Development: Use Vite proxy (direct Face++ call)
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        body: formData
+      });
+      
+      const data = await response.json();
+      
+      if (data.error_message) {
+        throw new Error(data.error_message);
+      }
+      
+      console.log('🔍 Face++ raw results:', data.results);
+      console.log('🔍 Total results returned:', data.results?.length || 0);
+      
+      // Filter results by confidence threshold
+      const matches = [];
+      if (data.results && data.results.length > 0) {
+        data.results.forEach(result => {
+          console.log(`Face match: ${result.face_token} - Confidence: ${result.confidence}%`);
+          if (result.confidence >= threshold) {
+            matches.push({
+              face_token: result.face_token,
+              confidence: result.confidence
+            });
+          }
+        });
+      }
+      
+      console.log(`✅ Matches above ${threshold}% threshold:`, matches.length);
+      return matches;
+    } else {
+      // Production: Use Vercel serverless function
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          selfieBase64: base64Image,
+          facesetToken: facesetToken
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      return data.matches || [];
     }
-    
-    return data.matches || [];
   } catch (error) {
     console.error('Face search error:', error);
     throw error;

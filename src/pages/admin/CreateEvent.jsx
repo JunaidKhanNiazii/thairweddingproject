@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import Navbar from "../../components/Navbar";
 import { createEvent, updateEvent } from "../../firebase";
-import { createFaceSet } from "../../utils/faceApi";
 import "../../styles/components.css";
 import "./CreateEvent.css";
 
@@ -72,14 +71,11 @@ function CreateEvent() {
         await updateEvent(eventId, { coverUrl: base64 });
       }
 
-      // 3. Create FaceSet on Face++ for this event
-      try {
-        await createFaceSet(eventId);
-      } catch (faceErr) {
-        console.warn("FaceSet creation failed:", faceErr.message);
-      }
+      // 3. With face-api.js, no need to create faceset
+      // Face descriptors will be stored directly in Firestore
+      console.log('✅ Event created, ready for photo uploads');
 
-      navigate("/admin/dashboard");
+      navigate(`/admin/event/${eventId}`);
     } catch (err) {
       setError(err.message || "Failed to create event");
     } finally {

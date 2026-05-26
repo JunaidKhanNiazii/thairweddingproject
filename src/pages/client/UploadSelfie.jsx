@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { getEvent, getFacesetToken, getPhotosByFaceTokens } from "../../firebase";
-import { searchFaces } from "../../utils/facePlusPlus";
+import { getPhotos } from "../../firebase";
+import { findMatches } from "../../utils/faceApi";
 
 export default function UploadSelfie() {
   const navigate = useNavigate();
@@ -75,38 +75,62 @@ export default function UploadSelfie() {
     try {
       console.log('🔍 Starting face search for event:', event.id);
       
-      // 1. Get faceset token for this event
-      const facesetToken = await getFacesetToken(event.id);
-      console.log('📦 Faceset token:', facesetToken);
+      // 1. Get all photos with face descriptors for this event
+      const allPhotos = await getPhotos(event.id);
+      console.log('📸 Total photos:', allPhotos.length);
       
-      if (!facesetToken) {
-        alert('No photos have been uploaded for this event yet');
+      // Filter photos that have face descriptors and reconstruct the descriptors array
+      const photosWithFaces = allPhotos
+        .filter(p => p.faceCount > 0)
+        .map(photo => {
+          // Reconstruct descriptors array from descriptor_0, descriptor_1, etc.
+          const descriptors = [];
+          for (let i = 0; i < photo.faceCount; i++) {
+            const descriptorKey = `descriptor_${i}`;
+            if (photo[descriptorKey]) {
+              descriptors.push(photo[descriptorKey]);
+            }
+          }
+          return {
+            ...photo,
+            faceDescriptors: descriptors
+          };
+        })
+        .filter(p => p.faceDescriptors.length > 0);
+      
+      console.log('👤 Photos with faces:', photosWithFaces.length);
+      
+      if (photosWithFaces.length === 0) {
+        alert('No photos with faces found for this event');
         setLoading(false);
         return;
       }
-
-      // 2. Search for matching faces using Face++ API
-      console.log('🔎 Searching for faces...');
-      const matches = await searchFaces(selectedImage, facesetToken, 70);
-      console.log('✅ Found matches:', matches);
       
-      if (!matches || matches.length === 0) {
-        console.log('⚠️ No face matches found');
-        navigate(`/event/${slug}/results`, { 
-          state: { 
-            matchedPhotos: [],
-            eventName: event.name 
-          } 
-        });
-        return;
-      }
+      // 2. Prepare photo descriptors for matching
+      const photoDescriptors = photosWithFaces.map(photo => ({
+        photoId: photo.id,
+        descriptors: photo.faceDescriptors.map(d => new Float32Array(d)),
+        imageData: photo.imageData,
+        fileName: photo.fileName
+      }));
       
-      // 3. Get photos that contain matching face tokens
-      console.log('📸 Getting photos for matches...');
-      const matchedPhotos = await getPhotosByFaceTokens(event.id, matches);
-      console.log('🎯 Matched photos:', matchedPhotos.length);
+      // 3. Find matches using face-api.js
+      console.log('🔎 Searching for matches...');
+      const matches = await findMatches(selectedImage, photoDescriptors, 0.6);
+      console.log('✅ Found matches:', matches.length);
       
-      // 4. Navigate to results with matched photos
+      // 4. Get matched photos
+      const matchedPhotos = matches.map(match => {
+        const photo = photosWithFaces.find(p => p.id === match.photoId);
+        return {
+          id: photo.id,
+          imageData: photo.imageData,
+          fileName: photo.fileName,
+          confidence: match.confidence
+        };
+      });
+      
+      // 5. Navigate to results
       navigate(`/event/${slug}/results`, { 
         state: { 
           matchedPhotos,
