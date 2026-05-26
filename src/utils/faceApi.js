@@ -61,5 +61,9 @@ export const searchFace = async (eventId, selfieFile, allPhotos = [], threshold 
   // Step 3: search against event FaceSet (auto-creates if missing)
   const data = await post("face-search", { faceToken: selfieTokens[0], eventId, threshold, allFaceTokens });
   if (data.error) throw new Error(data.error);
+  if (data.faceError) {
+    console.warn("Face++ warning:", data.faceError);
+    return [];
+  }
   return data.results || [];
 };

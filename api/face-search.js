@@ -1,6 +1,3 @@
-// Proxy: search a face token against an event FaceSet via Face++
-// Auto-creates FaceSet if missing and rebuilds from existing tokens
-
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export default async function handler(req, res) {
@@ -21,30 +18,33 @@ export default async function handler(req, res) {
   };
 
   try {
-    // Wait before first call to avoid overlap with detect call
     await sleep(1200);
 
-    // Try search first
+    // Try search
     let searchData = await post(`${BASE}/search`, {
       outer_id: eventId,
       face_token: faceToken,
       return_result_count: 100,
     });
 
-    // If FaceSet doesn't exist, create it and populate
+    console.log("search response:", JSON.stringify(searchData));
+
+    // FaceSet missing — create and populate
     if (searchData.error_message === "INVALID_OUTER_ID") {
       await sleep(1200);
-      await post(`${BASE}/faceset/create`, {
+      const createRes = await post(`${BASE}/faceset/create`, {
         outer_id: eventId,
         display_name: eventId,
       });
+      console.log("create faceset:", JSON.stringify(createRes));
 
       if (allFaceTokens.length > 0) {
         await sleep(1200);
-        await post(`${BASE}/faceset/addface`, {
+        const addRes = await post(`${BASE}/faceset/addface`, {
           outer_id: eventId,
           face_tokens: allFaceTokens.slice(0, 1000).join(","),
         });
+        console.log("addface:", JSON.stringify(addRes));
       }
 
       await sleep(1200);
@@ -53,14 +53,17 @@ export default async function handler(req, res) {
         face_token: faceToken,
         return_result_count: 100,
       });
+      console.log("retry search:", JSON.stringify(searchData));
     }
 
+    // FaceSet exists but empty
     if (searchData.error_message === "EMPTY_FACESET") {
       return res.status(200).json({ results: [] });
     }
 
+    // Any other Face++ error — return it clearly
     if (searchData.error_message) {
-      return res.status(400).json({ error: searchData.error_message });
+      return res.status(200).json({ results: [], faceError: searchData.error_message });
     }
 
     const results = (searchData.results || [])
@@ -69,6 +72,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ results });
   } catch (err) {
+    console.error("face-search error:", err.message);
     return res.status(500).json({ error: err.message });
   }
 }
