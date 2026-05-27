@@ -83,10 +83,10 @@ function CreateEvent() {
       setLoading(false);
       setToast({ message: "Event created successfully!", type: "success" });
 
-      // Navigate after a brief delay
+      // Navigate after showing toast for 2 seconds
       setTimeout(() => {
         navigate(`/admin/events/${eventId}`);
-      }, 1500);
+      }, 2000);
     } catch (err) {
       console.error('Event creation error:', err);
       setError(err.message || "Failed to create event");

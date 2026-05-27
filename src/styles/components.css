@@ -156,7 +156,7 @@
 /* TOAST NOTIFICATIONS */
 .toast {
   position: fixed;
-  bottom: 24px;
+  top: 24px;
   right: 24px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
@@ -165,10 +165,10 @@
   box-shadow: var(--shadow-soft);
   max-width: 400px;
   z-index: 9999;
-  animation: slideIn 300ms ease;
+  animation: slideInFromRight 300ms ease;
 }
 
-@keyframes slideIn {
+@keyframes slideInFromRight {
   from {
     transform: translateX(100%);
     opacity: 0;
@@ -408,6 +408,6 @@
   .toast {
     left: 16px;
     right: 16px;
-    bottom: 16px;
+    top: 16px;
   }
 }
