@@ -8,6 +8,15 @@ import "./CreateEvent.css";
 
 const generateSlug = () => Math.random().toString(36).substring(2, 10);
 
+// Toast notification component
+function Toast({ message, type, onClose }) {
+  return (
+    <div className={`toast toast-${type}`}>
+      <span>{message}</span>
+    </div>
+  );
+}
+
 function CreateEvent() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -15,6 +24,7 @@ function CreateEvent() {
   const [coverPreview, setCoverPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [toast, setToast] = useState(null);
 
   const handleLogout = async () => {
     await logout();
@@ -69,10 +79,14 @@ function CreateEvent() {
       // Face descriptors will be stored directly in Firestore
       console.log('✅ Event created, ready for photo uploads');
 
-      // Navigate after a brief delay to ensure state updates
+      // Stop loading and show success
+      setLoading(false);
+      setToast({ message: "Event created successfully!", type: "success" });
+
+      // Navigate after a brief delay
       setTimeout(() => {
         navigate(`/admin/events/${eventId}`);
-      }, 100);
+      }, 1500);
     } catch (err) {
       console.error('Event creation error:', err);
       setError(err.message || "Failed to create event");
@@ -135,6 +149,7 @@ function CreateEvent() {
           </div>
         </form>
       </div>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }
