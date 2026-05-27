@@ -69,10 +69,13 @@ function CreateEvent() {
       // Face descriptors will be stored directly in Firestore
       console.log('✅ Event created, ready for photo uploads');
 
-      navigate(`/admin/events/${eventId}`);
+      // Navigate after a brief delay to ensure state updates
+      setTimeout(() => {
+        navigate(`/admin/events/${eventId}`);
+      }, 100);
     } catch (err) {
+      console.error('Event creation error:', err);
       setError(err.message || "Failed to create event");
-    } finally {
       setLoading(false);
     }
   };
