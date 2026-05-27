@@ -27,6 +27,8 @@
   text-transform: uppercase;
   color: var(--text-white);
   margin: 0;
+  cursor: default;
+  user-select: none;
 }
 
 .events-list {
